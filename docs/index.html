@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agenda Farma - Directorio Interactivo</title>
+    <meta name="description" content="Agenda interactiva y directorio de contactos de Representantes de Ventas y Gerentes de Distrito con búsqueda rápida, filtros por región y unidad, y sincronización con Google Sheets." />
+    <meta property="og:title" content="Agenda Farma - Directorio Interactivo" />
+    <meta property="og:description" content="Agenda interactiva y directorio de contactos de Representantes de Ventas y Gerentes de Distrito con búsqueda rápida, filtros por región y unidad, y sincronización con Google Sheets." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script type="module" crossorigin src="./assets/app.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      (function () {
+        var isViteDev = !!document.querySelector('script[src*="@vite/client"]');
+        var isViteBuilt = !!document.querySelector('script[src*="assets/"]');
+        if (!isViteDev && !isViteBuilt) {
+          var link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = './dist/assets/index.css';
+          document.head.appendChild(link);
+          var script = document.createElement('script');
+          script.type = 'module';
+          script.src = './dist/assets/app.js';
+          document.body.appendChild(script);
+        }
+      })();
+    </script>
+  </body>
+</html>
+
