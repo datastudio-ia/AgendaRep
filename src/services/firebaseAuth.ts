@@ -6,11 +6,36 @@ import {
   onAuthStateChanged,
   signOut,
   User,
+  Auth,
 } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+};
+
+const OAUTH_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
+
+let cachedAuthInstance: Auth | null = null;
+
+export const getFirebaseAuth = (): Auth | null => {
+  if (cachedAuthInstance) return cachedAuthInstance;
+  if (!firebaseConfig.apiKey || firebaseConfig.apiKey.trim() === '') {
+    return null;
+  }
+  try {
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    cachedAuthInstance = getAuth(app);
+    return cachedAuthInstance;
+  } catch (err) {
+    console.warn('Firebase Auth no configurado o clave inválida; ejecutando en modo local:', err);
+    return null;
+  }
+};
 
 export interface AuthUser {
   uid: string;
@@ -83,26 +108,39 @@ export const initAuth = (
     if (onAuthSuccess) onAuthSuccess(currentAuthUser, cachedAccessToken);
   }
 
-  return onAuthStateChanged(auth, async (user: User | null) => {
-    if (user) {
-      const authUser: AuthUser = {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
-      };
-      currentAuthUser = authUser;
-      try {
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
-      } catch {}
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(authUser, cachedAccessToken);
-      }
-    } else if (!currentAuthUser) {
-      clearAuthSession();
-      if (onAuthFailure) onAuthFailure();
+  const authInstance = getFirebaseAuth();
+  if (!authInstance) {
+    if (!currentAuthUser && onAuthFailure) {
+      onAuthFailure();
     }
-  });
+    return () => {};
+  }
+
+  try {
+    return onAuthStateChanged(authInstance, async (user: User | null) => {
+      if (user) {
+        const authUser: AuthUser = {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        };
+        currentAuthUser = authUser;
+        try {
+          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
+        } catch {}
+        if (cachedAccessToken) {
+          if (onAuthSuccess) onAuthSuccess(authUser, cachedAccessToken);
+        }
+      } else if (!currentAuthUser) {
+        clearAuthSession();
+        if (onAuthFailure) onAuthFailure();
+      }
+    });
+  } catch (err) {
+    console.warn('Error suscribiendo estado de Firebase Auth:', err);
+    return () => {};
+  }
 };
 
 /**
@@ -173,29 +211,35 @@ export const googleSignIn = async (): Promise<{ user: AuthUser; accessToken: str
   try {
     isSigningIn = true;
 
-    // Strategy 1: Firebase Auth Popup
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        const authUser: AuthUser = {
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
-          photoURL: result.user.photoURL,
-        };
-        saveAuthSession(authUser, credential.accessToken);
-        return { user: authUser, accessToken: credential.accessToken };
-      }
-    } catch (firebaseErr: any) {
-      console.warn('Firebase signInWithPopup failed, falling back to Google Identity Services:', firebaseErr);
-      if (firebaseErr?.code === 'auth/popup-closed-by-user') {
-        throw new Error('Inicio de sesión cancelado.');
+    // Strategy 1: Firebase Auth Popup (if configured)
+    const authInstance = getFirebaseAuth();
+    if (authInstance) {
+      try {
+        const result = await signInWithPopup(authInstance, provider);
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken) {
+          const authUser: AuthUser = {
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            photoURL: result.user.photoURL,
+          };
+          saveAuthSession(authUser, credential.accessToken);
+          return { user: authUser, accessToken: credential.accessToken };
+        }
+      } catch (firebaseErr: any) {
+        console.warn('Firebase signInWithPopup failed, falling back to Google Identity Services:', firebaseErr);
+        if (firebaseErr?.code === 'auth/popup-closed-by-user') {
+          throw new Error('Inicio de sesión cancelado.');
+        }
       }
     }
 
     // Strategy 2: Google Identity Services (GIS) Token Client
-    const token = await requestGsiToken(firebaseConfig.oAuthClientId, SCOPES);
+    if (!OAUTH_CLIENT_ID) {
+      throw new Error('Credenciales de Google OAuth no configuradas en las variables de entorno.');
+    }
+    const token = await requestGsiToken(OAUTH_CLIENT_ID, SCOPES);
     if (!token) {
       throw new Error('No se pudo obtener el token de acceso de Google.');
     }
@@ -255,7 +299,10 @@ export const getAuthUser = (): AuthUser | null => {
 
 export const logout = async (): Promise<void> => {
   try {
-    await signOut(auth);
+    const authInstance = getFirebaseAuth();
+    if (authInstance) {
+      await signOut(authInstance);
+    }
   } catch {}
   clearAuthSession();
 };
