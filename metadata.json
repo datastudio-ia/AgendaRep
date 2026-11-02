@@ -1,0 +1,8 @@
+{
+  "name": "Agenda Farma - Directorio Interactivo",
+  "description": "Agenda interactiva y directorio de contactos de Representantes de Ventas y Gerentes de Distrito con búsqueda rápida, filtros por región y unidad, y sincronización con Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
