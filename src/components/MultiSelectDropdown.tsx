@@ -80,19 +80,19 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
   };
 
   return (
-    <div className={`relative block w-full max-w-full text-left ${className}`} ref={dropdownRef}>
+    <div className={`relative block sm:inline-block w-full sm:w-auto max-w-full text-left ${className}`} ref={dropdownRef}>
       {/* Dropdown trigger button */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full max-w-full text-sm rounded-xl px-3 py-2 font-medium transition-all cursor-pointer flex items-center justify-between gap-2 select-none ${
+        className={`w-full sm:w-auto max-w-full text-sm sm:text-xs rounded-xl sm:rounded-full px-3 sm:px-3.5 py-2 font-medium transition-all cursor-pointer flex items-center justify-between sm:justify-start gap-2 select-none ${
           hasSelections
             ? 'bg-theme-10 text-theme-primary border border-theme-30 shadow-2xs font-bold'
             : 'bg-[#F8F4F2] text-[#1A1A1E] border border-[#EAE5E1] hover:bg-slate-200/60'
         }`}
         title={hasSelections ? `${selectedValues.length} seleccionados` : label}
       >
-        <span className="truncate flex-1 text-left">{getButtonText()}</span>
+        <span className="truncate flex-1 sm:flex-initial sm:max-w-[170px] text-left">{getButtonText()}</span>
 
         {hasSelections ? (
           <span
@@ -104,7 +104,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           </span>
         ) : (
           <ChevronDown
-            className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${
+            className={`w-4 h-4 sm:w-3.5 sm:h-3.5 text-slate-400 transition-transform shrink-0 ${
               isOpen ? 'rotate-180 text-theme-primary' : ''
             }`}
           />
@@ -113,7 +113,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
 
       {/* Popover menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 mt-1.5 w-full max-w-full bg-white rounded-2xl border border-[#EAE5E1] shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 right-0 sm:right-auto mt-1.5 w-full sm:w-64 max-w-full sm:max-w-none bg-white rounded-2xl border border-[#EAE5E1] shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-150">
           {/* Header controls: select all / clear */}
           <div className="flex items-center justify-between px-3 pb-2 mb-1 border-b border-[#EAE5E1] text-xs">
             <span className="font-extrabold text-slate-400 uppercase tracking-wider truncate">

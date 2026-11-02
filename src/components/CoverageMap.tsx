@@ -1474,15 +1474,15 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
   const totalRepsCovered = typeFilteredReps.length;
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-full overflow-x-hidden">
+    <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full overflow-x-hidden">
       {/* 1. Header Card con controles integrados (Region, Linea, Todos) */}
-      <div className="relative z-30 bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 w-full max-w-full">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl theme-gradient-bg flex items-center justify-center text-white shrink-0 shadow-2xs">
-            <Compass className="w-4 h-4" />
+      <div className="relative z-30 bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 border border-[#EAE5E1] shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4 w-full max-w-full">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl theme-gradient-bg flex items-center justify-center text-white shrink-0 shadow-2xs">
+            <Compass className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-base font-black text-[#1A1A1E] tracking-tight truncate">
+            <h2 className="text-base sm:text-xl font-black text-[#1A1A1E] tracking-tight truncate">
               Mapa Territorial por Regiones
             </h2>
           </div>
@@ -1506,12 +1506,12 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
         />
       </div>
 
-      {/* 2. Main Single-Column Stack: Interactive Map + Selected State Inspector */}
-      <div className="grid grid-cols-1 gap-3 items-start w-full max-w-full">
-        {/* Top Section: Interactive Venezuela Map Canvas */}
-        <div className="flex flex-col w-full max-w-full">
+      {/* 2. Main Layout: 1 col on mobile, 12-col split on desktop (7 cols map + 5 cols inspector) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 items-start w-full max-w-full">
+        {/* Left/Top Section: Interactive Venezuela Map Canvas */}
+        <div className="lg:col-span-7 flex flex-col w-full max-w-full">
           <div
-            className="rounded-2xl border border-blue-200/90 p-2 shadow-2xs flex flex-col justify-between relative overflow-hidden min-h-[260px] w-full max-w-full"
+            className="rounded-2xl sm:rounded-3xl border border-blue-200/90 p-2 sm:p-4 shadow-2xs flex flex-col justify-between relative overflow-hidden min-h-[260px] sm:min-h-[460px] w-full max-w-full"
             style={{
               background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 52%, #BFDBFE 100%)',
             }}
@@ -1525,10 +1525,10 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
           </div>
         </div>
 
-        {/* Bottom Section: Liderazgo y Representantes del Estado Seleccionado */}
-        <div ref={inspectorRef} className="flex flex-col gap-3 w-full max-w-full">
+        {/* Right/Bottom Section: Liderazgo y Representantes del Estado Seleccionado */}
+        <div ref={inspectorRef} className="lg:col-span-5 flex flex-col gap-3 sm:gap-4 w-full max-w-full">
           {activeState ? (
-            <div className="bg-white rounded-2xl border border-[#EAE5E1] p-3 shadow-2xs flex flex-col space-y-3 w-full max-w-full">
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-[#EAE5E1] p-3 sm:p-5 shadow-2xs flex flex-col space-y-3 sm:space-y-4 w-full max-w-full">
               {/* Header of Selected State */}
               <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#EAE5E1]">
                 <div className="flex items-start gap-2.5">

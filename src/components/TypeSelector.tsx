@@ -107,17 +107,17 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
       : unifiedReps.filter((r) => isRepActive(r)).length);
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-full overflow-x-hidden">
+    <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full overflow-x-hidden">
       {/* 1. Header del Directorio Unificado */}
-      <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 w-full max-w-full">
-        {/* Fila superior: Título y Botón Agregar Representante apilados verticalmente */}
-        <div className="flex flex-col gap-2.5 w-full">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl theme-gradient-bg text-white flex items-center justify-center shadow-2xs shrink-0">
-              <Users className="w-4 h-4" />
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 sm:gap-5 w-full max-w-full">
+        {/* Fila superior: Título y Botón Agregar Representante */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 w-full">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl theme-gradient-bg text-white flex items-center justify-center shadow-2xs shrink-0">
+              <Users className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-black text-[#1A1A1E] tracking-tight truncate">
+              <h3 className="text-base sm:text-xl font-black text-[#1A1A1E] tracking-tight truncate">
                 Directorio de Representantes
               </h3>
               <p className="text-xs text-slate-500 font-medium truncate">
@@ -130,7 +130,7 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
           {onAddRep && (
             <button
               onClick={onAddRep}
-              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0"
               title="Agregar nuevo representante"
             >
               <UserPlus className="w-4 h-4 shrink-0" />
@@ -139,52 +139,73 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
           )}
         </div>
 
-        {/* Las tres etiquetas informativas apiladas en una sola columna */}
-        <div className="grid grid-cols-1 gap-2 pt-2 border-t border-[#EAE5E1]/80 w-full">
+        {/* Las tres etiquetas informativas: 1 col en móvil, 3 cols en PC */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 pt-2 sm:pt-4 border-t border-[#EAE5E1]/80 w-full">
           {/* Selector 1: La Santé */}
           <div
-            className="bg-[#F8F4F2]/80 rounded-xl p-2.5 border border-[#EAE5E1] flex items-center justify-between gap-2.5 select-none w-full"
+            className="bg-[#F8F4F2]/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 border border-[#EAE5E1] flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3.5 select-none w-full"
             title="Unidad de Negocio: La Santé"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center text-blue-600 shrink-0">
-                <Pill className="w-4 h-4 -rotate-45" />
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-600 shrink-0">
+                <Pill className="w-4 h-4 sm:w-5 sm:h-5 -rotate-45" />
               </div>
-              <div className="text-sm text-[#1A1A1E] font-black truncate tracking-tight">La Santé</div>
+              <div className="min-w-0">
+                <div className="hidden sm:block text-xl font-black text-[#1A1A1E] font-mono tabular-nums leading-none">
+                  {countLaSanteCalc}
+                </div>
+                <div className="text-sm sm:text-xs text-[#1A1A1E] sm:text-slate-600 font-black sm:font-bold truncate tracking-tight sm:mt-1">
+                  La Santé
+                </div>
+              </div>
             </div>
-            <div className="text-sm font-black text-[#1A1A1E] font-mono tabular-nums bg-white px-2.5 py-1 rounded-lg border border-[#EAE5E1]/70 shadow-2xs shrink-0">
+            <div className="sm:hidden text-sm font-black text-[#1A1A1E] font-mono tabular-nums bg-white px-2.5 py-1 rounded-lg border border-[#EAE5E1]/70 shadow-2xs shrink-0">
               {countLaSanteCalc}
             </div>
           </div>
 
           {/* Selector 2: Pharmetique */}
           <div
-            className="bg-[#F8F4F2]/80 rounded-xl p-2.5 border border-[#EAE5E1] flex items-center justify-between gap-2.5 select-none w-full"
+            className="bg-[#F8F4F2]/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 border border-[#EAE5E1] flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3.5 select-none w-full"
             title="Unidad de Negocio: Pharmetique"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-600 shrink-0">
-                <Sparkles className="w-4 h-4" />
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-600 shrink-0">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div className="text-sm text-[#1A1A1E] font-black truncate tracking-tight">Pharmetique</div>
+              <div className="min-w-0">
+                <div className="hidden sm:block text-xl font-black text-[#1A1A1E] font-mono tabular-nums leading-none">
+                  {countPharmetiqueCalc}
+                </div>
+                <div className="text-sm sm:text-xs text-[#1A1A1E] sm:text-slate-600 font-black sm:font-bold truncate tracking-tight sm:mt-1">
+                  Pharmetique
+                </div>
+              </div>
             </div>
-            <div className="text-sm font-black text-[#1A1A1E] font-mono tabular-nums bg-white px-2.5 py-1 rounded-lg border border-[#EAE5E1]/70 shadow-2xs shrink-0">
+            <div className="sm:hidden text-sm font-black text-[#1A1A1E] font-mono tabular-nums bg-white px-2.5 py-1 rounded-lg border border-[#EAE5E1]/70 shadow-2xs shrink-0">
               {countPharmetiqueCalc}
             </div>
           </div>
 
           {/* Selector 3: OTC */}
           <div
-            className="bg-[#F8F4F2]/80 rounded-xl p-2.5 border border-[#EAE5E1] flex items-center justify-between gap-2.5 select-none w-full"
+            className="bg-[#F8F4F2]/80 rounded-xl sm:rounded-2xl p-2.5 sm:p-4 border border-[#EAE5E1] flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3.5 select-none w-full"
             title="Unidad de Negocio: OTC"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-rose-500/15 flex items-center justify-center text-rose-600 shrink-0">
-                <HeartPulse className="w-4 h-4" />
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-rose-500/15 flex items-center justify-center text-rose-600 shrink-0">
+                <HeartPulse className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div className="text-sm text-[#1A1A1E] font-black truncate tracking-tight">OTC</div>
+              <div className="min-w-0">
+                <div className="hidden sm:block text-xl font-black text-[#1A1A1E] font-mono tabular-nums leading-none">
+                  {countOtcCalc}
+                </div>
+                <div className="text-sm sm:text-xs text-[#1A1A1E] sm:text-slate-600 font-black sm:font-bold truncate tracking-tight sm:mt-1">
+                  OTC
+                </div>
+              </div>
             </div>
-            <div className="text-sm font-black text-[#1A1A1E] font-mono tabular-nums bg-white px-2.5 py-1 rounded-lg border border-[#EAE5E1]/70 shadow-2xs shrink-0">
+            <div className="sm:hidden text-sm font-black text-[#1A1A1E] font-mono tabular-nums bg-white px-2.5 py-1 rounded-lg border border-[#EAE5E1]/70 shadow-2xs shrink-0">
               {countOtcCalc}
             </div>
           </div>

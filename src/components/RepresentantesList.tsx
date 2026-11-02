@@ -244,10 +244,10 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
     );
   }
 
-  // Mobile-First single column (1fr) vertical cards stack
+  // Mobile-First single column (1fr) on mobile, 2 cols on tablet, 3 cols on PC
   return (
     <>
-      <div className="grid grid-cols-1 gap-2.5 w-full max-w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 w-full max-w-full">
         {reps.map((rep) => {
           const isActive = isRepActive(rep);
           const initials = rep.nombre
@@ -260,9 +260,9 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
           return (
             <div
               key={rep.id}
-              className={`bg-white rounded-2xl border w-full max-w-full overflow-hidden ${
+              className={`bg-white rounded-2xl sm:rounded-3xl border w-full max-w-full overflow-hidden ${
                 !isActive ? 'border-dashed border-rose-300/80 bg-rose-50/15 opacity-85' : 'border-[#EAE5E1]'
-              } p-3 shadow-2xs hover:border-theme-30 transition-all flex flex-col justify-between group`}
+              } p-3 sm:p-5 shadow-2xs hover:border-theme-30 transition-all flex flex-col justify-between group`}
             >
               <div>
                 {/* Card top row */}

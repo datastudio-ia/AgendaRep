@@ -1057,9 +1057,9 @@ export default function App() {
       )}
 
       {/* 4. Main Body Container */}
-      <main className="flex-1 w-full max-w-full overflow-x-hidden mx-auto px-2.5 py-2.5 flex flex-col">
+      <main className="flex-1 w-full max-w-full md:max-w-[1440px] overflow-x-hidden mx-auto px-2.5 sm:px-6 lg:px-8 py-2.5 sm:py-6 flex flex-col">
         {activeTab === 'reps' && (
-          <div className="flex flex-col gap-3 w-full max-w-full">
+          <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full">
             {/* Directorio Unificado de Representantes */}
             <TypeSelector
               reps={filteredReps}
@@ -1089,19 +1089,19 @@ export default function App() {
         )}
 
         {activeTab === 'gds' && (
-          <div className="flex flex-col gap-3 w-full max-w-full">
-            <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-xs w-full max-w-full flex flex-col gap-2.5">
+          <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-xs w-full max-w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
               <div>
-                <h1 className="text-base font-black text-[#1A1A1E] tracking-tight leading-snug">
+                <h1 className="text-base sm:text-xl font-black text-[#1A1A1E] tracking-tight leading-snug">
                   Gerentes de Distrito y Coordinadores
                 </h1>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
                   Líderes de gerencias de distrito, comercialización y trade marketing.
                 </p>
               </div>
               <button
                 onClick={handleOpenCreateGd}
-                className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-xl font-bold text-sm transition-all shadow-xs cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-xl sm:rounded-full font-bold text-sm transition-all shadow-xs cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4 shrink-0" />
                 <span>Nuevo Líder / GD</span>

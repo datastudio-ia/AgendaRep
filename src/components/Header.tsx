@@ -53,25 +53,84 @@ export const Header: React.FC<HeaderProps> = ({
     <header
       className={`sticky top-0 z-40 w-full max-w-full bg-gradient-to-r ${themeConfig.palette.bannerGradient} text-white shadow-md border-b border-white/10 transition-all duration-300`}
     >
-      <div className="w-full max-w-full mx-auto px-3">
-        <div className="flex items-center justify-between gap-2 h-12">
+      <div className="w-full max-w-full md:max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 h-12 sm:h-16">
           {/* Zone 1: Brand Wordmark */}
           <button
             onClick={() => onTabChange('reps')}
-            className="flex items-center gap-1.5 group cursor-pointer focus:outline-none min-w-0"
+            className="flex items-center gap-1.5 group cursor-pointer focus:outline-none min-w-0 shrink-0"
             aria-label="Ir a inicio de representantes"
           >
-            <span className="text-lg font-black tracking-tight text-white drop-shadow-xs truncate">
+            <span className="text-lg sm:text-2xl font-black tracking-tight text-white drop-shadow-xs truncate">
               AgendaRep
             </span>
           </button>
 
-          {/* Zone 2: Botón Configuración */}
+          {/* Zone 2 (Desktop): Centered Main Navigation */}
+          <nav className="hidden md:flex items-center gap-1.5 bg-black/15 p-1 rounded-full border border-white/15 backdrop-blur-xs">
+            <button
+              onClick={() => onTabChange('reps')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'reps'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-white/90 hover:text-white hover:bg-white/15'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Representantes ({totalRepsCount})</span>
+            </button>
+            <button
+              onClick={() => onTabChange('gds')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'gds'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-white/90 hover:text-white hover:bg-white/15'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>GD - Coordinadores</span>
+            </button>
+            <button
+              onClick={() => onTabChange('map')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'map'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-white/90 hover:text-white hover:bg-white/15'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Mapa Territorial</span>
+            </button>
+            <button
+              onClick={() => onTabChange('analytics')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'analytics'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-white/90 hover:text-white hover:bg-white/15'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Resumen</span>
+            </button>
+            <button
+              onClick={() => onTabChange('matrix')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'matrix'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-white/90 hover:text-white hover:bg-white/15'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>Organigrama</span>
+            </button>
+          </nav>
+
+          {/* Zone 3: Botón Configuración */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="relative flex items-center shrink-0" ref={configMenuRef}>
               <button
                 onClick={() => setIsConfigOpen((prev) => !prev)}
-                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all cursor-pointer shadow-sm border shrink-0 ${
+                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full transition-all cursor-pointer shadow-sm border shrink-0 ${
                   isConfigOpen || activeTab === 'sheets'
                     ? 'bg-white text-slate-900 border-white shadow-md'
                     : 'bg-white/15 hover:bg-white/25 text-white border-white/25'
@@ -83,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               {isConfigOpen && (
-                <div className="absolute right-0 top-full mt-2 w-[calc(100vw-24px)] max-w-[270px] bg-white rounded-2xl shadow-2xl border border-slate-200/90 text-slate-800 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 top-full mt-2 w-[calc(100vw-24px)] max-w-[270px] sm:w-64 bg-white rounded-2xl shadow-2xl border border-slate-200/90 text-slate-800 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="px-2.5 py-1.5 border-b border-slate-100">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       Opciones de Configuración
@@ -213,8 +272,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Mobile-First Navigation Strip */}
-        <nav className="flex overflow-x-auto gap-1.5 py-2 border-t border-white/15 text-xs font-semibold scrollbar-none w-full max-w-full">
+        {/* Mobile Navigation Strip (visible only below md) */}
+        <nav className="md:hidden flex overflow-x-auto gap-1.5 py-2 border-t border-white/15 text-xs font-semibold scrollbar-none w-full max-w-full">
           <button
             onClick={() => onTabChange('reps')}
             className={`whitespace-nowrap px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${

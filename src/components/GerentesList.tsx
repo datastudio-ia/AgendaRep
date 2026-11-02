@@ -87,13 +87,13 @@ export const GerentesList: React.FC<GerentesListProps> = ({
   }
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-full overflow-x-hidden">
-      {/* Interactive Role Buttons stacked in 1 column */}
-      <div className="grid grid-cols-1 gap-2 w-full max-w-full">
+    <div className="flex flex-col gap-3 sm:gap-5 w-full max-w-full overflow-x-hidden">
+      {/* Interactive Role Buttons: 1 col on mobile, 3 cols on PC */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 w-full max-w-full">
         {/* Button 1: Gerentes de Distrito */}
         <button
           onClick={() => setRole('gerentes')}
-          className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group w-full ${
+          className={`p-3 sm:p-4 rounded-2xl sm:rounded-3xl border text-left transition-all cursor-pointer relative overflow-hidden group w-full ${
             currentRole === 'gerentes'
               ? 'bg-white border-theme-primary ring-2 ring-theme-20 shadow-xs'
               : 'bg-white/80 hover:bg-white border-[#EAE5E1] shadow-2xs'
@@ -411,7 +411,7 @@ export const GerentesList: React.FC<GerentesListProps> = ({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2.5 w-full max-w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 w-full max-w-full">
           {displayedGds.map((gd) => {
             const count = teamCounts[gd.nombre.trim()] || 0;
             const isVacant = gd.nombre.includes('VACANTE') || gd.status === 'INACTIVO';
@@ -419,7 +419,7 @@ export const GerentesList: React.FC<GerentesListProps> = ({
             return (
               <div
                 key={gd.id}
-                className="bg-white rounded-2xl border border-[#EAE5E1] p-3 shadow-2xs hover:border-theme-30 transition-all flex flex-col justify-between group w-full max-w-full overflow-hidden"
+                className="bg-white rounded-2xl sm:rounded-3xl border border-[#EAE5E1] p-3 sm:p-5 shadow-2xs hover:border-theme-30 transition-all flex flex-col justify-between group w-full max-w-full overflow-hidden"
               >
                 <div>
                   {/* Header: Role Pill & Name */}

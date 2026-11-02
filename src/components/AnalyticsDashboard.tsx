@@ -136,116 +136,132 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   const maxManagerTeam = Math.max(...managerWorkload.map((m) => m.teamSize), 1);
 
   return (
-    <div className="flex flex-col gap-3 w-full max-w-full overflow-x-hidden animate-in fade-in duration-200">
+    <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full overflow-x-hidden animate-in fade-in duration-200">
       {/* Dashboard Header */}
-      <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 w-full max-w-full">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 w-full max-w-full">
         <div className="flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl theme-gradient-bg flex items-center justify-center text-white shrink-0 shadow-2xs">
-              <BarChart3 className="w-4.5 h-4.5" />
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl theme-gradient-bg flex items-center justify-center text-white shrink-0 shadow-2xs">
+              <BarChart3 className="w-4.5 h-4.5 sm:w-6 sm:h-6" />
             </div>
-            <h2 className="text-base font-black text-[#1A1A1E] tracking-tight truncate">
+            <h2 className="text-base sm:text-xl md:text-2xl font-black text-[#1A1A1E] tracking-tight truncate">
               Distribución de Representantes
             </h2>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-[#F8F4F2] px-2.5 py-1 rounded-xl border border-[#EAE5E1] shrink-0">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span className="text-[11px] font-bold text-slate-700">100% Validados</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-[#F8F4F2] px-2.5 sm:px-4 py-1 sm:py-2 rounded-xl sm:rounded-2xl border border-[#EAE5E1] shrink-0">
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+            <span className="text-[11px] sm:text-xs font-bold text-slate-700">100% Validados</span>
           </div>
         </div>
       </div>
 
-      {/* 4 Stat Metric Cards - Single Column Stack */}
-      <div className="grid grid-cols-1 gap-2 w-full max-w-full">
-        <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex items-center justify-between gap-2">
-          <div>
+      {/* 4 Stat Metric Cards: 1 col on mobile, 2 on tablet, 4 on PC */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 w-full max-w-full">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 border border-[#EAE5E1] shadow-2xs flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+          <div className="flex sm:items-center sm:justify-between flex-col sm:flex-row">
             <div className="text-slate-500 text-xs font-bold">
               Fuerza de Ventas
             </div>
-            <div className="text-[11px] text-slate-400 font-medium">
+            <Users className="hidden sm:block w-4 h-4 text-theme-primary shrink-0" />
+            <div className="sm:hidden text-[11px] text-slate-400 font-medium">
               100% activos en territorio
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-lg font-black text-[#1A1A1E] font-mono tabular-nums">
+          <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-0">
+            <div className="text-lg sm:text-3xl font-black text-[#1A1A1E] font-mono tabular-nums">
               {totalReps}
             </div>
-            <Users className="w-4 h-4 text-theme-primary shrink-0" />
+            <Users className="sm:hidden w-4 h-4 text-theme-primary shrink-0" />
+            <div className="hidden sm:block mt-2 text-[11px] text-slate-400 font-medium">
+              100% activos en territorio
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex items-center justify-between gap-2">
-          <div>
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 border border-[#EAE5E1] shadow-2xs flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+          <div className="flex sm:items-center sm:justify-between flex-col sm:flex-row">
             <div className="text-slate-500 text-xs font-bold">
               Promedio Equipo / GD
             </div>
-            <div className="text-[11px] text-slate-400 font-medium">
+            <TrendingUp className="hidden sm:block w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="sm:hidden text-[11px] text-slate-400 font-medium">
               Por gerente de distrito
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-lg font-black text-emerald-600 font-mono tabular-nums">
-              {avgTeamSize} <span className="text-xs font-bold text-slate-400">reps</span>
+          <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-0">
+            <div className="text-lg sm:text-3xl font-black text-emerald-600 font-mono tabular-nums">
+              {avgTeamSize} <span className="text-xs sm:text-sm font-bold text-slate-400">reps</span>
             </div>
-            <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
+            <TrendingUp className="sm:hidden w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="hidden sm:block mt-2 text-[11px] text-slate-400 font-medium">
+              Por gerente de distrito con asignación
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex items-center justify-between gap-2">
-          <div>
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 border border-[#EAE5E1] shadow-2xs flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+          <div className="flex sm:items-center sm:justify-between flex-col sm:flex-row">
             <div className="text-slate-500 text-xs font-bold">
               Comercial vs Médica
             </div>
-            <div className="text-[11px] text-slate-400 font-medium">
+            <Briefcase className="hidden sm:block w-4 h-4 text-theme-secondary shrink-0" />
+            <div className="sm:hidden text-[11px] text-slate-400 font-medium">
               {countComercial} Comerciales · {countVisitaMedica} Médicos
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-base font-black text-[#1A1A1E] font-mono tabular-nums">
+          <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-0">
+            <div className="text-base sm:text-3xl font-black text-[#1A1A1E] font-mono tabular-nums">
               {Math.round((countComercial / totalReps) * 100)}% / {Math.round((countVisitaMedica / totalReps) * 100)}%
             </div>
-            <Briefcase className="w-4 h-4 text-theme-secondary shrink-0" />
+            <Briefcase className="sm:hidden w-4 h-4 text-theme-secondary shrink-0" />
+            <div className="hidden sm:block mt-2 text-[11px] text-slate-400 font-medium">
+              {countComercial} Comerciales · {countVisitaMedica} Médicos
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs flex items-center justify-between gap-2">
-          <div>
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 border border-[#EAE5E1] shadow-2xs flex sm:flex-col items-center sm:items-stretch justify-between gap-2">
+          <div className="flex sm:items-center sm:justify-between flex-col sm:flex-row">
             <div className="text-slate-500 text-xs font-bold">
               Estructura de Líderes
             </div>
-            <div className="text-[11px] text-slate-400 font-medium">
+            <Award className="hidden sm:block w-4 h-4 text-purple-600 shrink-0" />
+            <div className="sm:hidden text-[11px] text-slate-400 font-medium">
               {activeGds.filter((g) => g.cargo.toUpperCase().includes('GERENTE')).length} Gerentes · {activeGds.filter((g) => g.cargo.toUpperCase().includes('COORDINADOR')).length} Coord.
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="text-lg font-black text-[#1A1A1E] font-mono tabular-nums">
-              {activeGds.length}
+          <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-0">
+            <div className="text-lg sm:text-3xl font-black text-[#1A1A1E] font-mono tabular-nums">
+              {activeGds.length} <span className="hidden sm:inline text-sm font-bold text-slate-400">líderes</span>
             </div>
-            <Award className="w-4 h-4 text-purple-600 shrink-0" />
+            <Award className="sm:hidden w-4 h-4 text-purple-600 shrink-0" />
+            <div className="hidden sm:block mt-2 text-[11px] text-slate-400 font-medium">
+              {activeGds.filter((g) => g.cargo.toUpperCase().includes('GERENTE')).length} Gerentes y {activeGds.filter((g) => g.cargo.toUpperCase().includes('COORDINADOR')).length} Coordinadores
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Row 2: Manager Workload Chart & Regional Distribution - Single Column */}
-      <div className="grid grid-cols-1 gap-3 w-full max-w-full">
+      {/* Row 2: Manager Workload Chart & Regional Distribution (1 col on mobile, 12-col split on PC) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-6 w-full max-w-full">
         {/* Manager Workload Bar Chart */}
-        <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs space-y-3 w-full max-w-full">
+        <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs space-y-3 sm:space-y-5 w-full max-w-full">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="text-sm font-black text-[#1A1A1E] tracking-tight">
+              <h3 className="text-sm sm:text-base font-black text-[#1A1A1E] tracking-tight">
                 Carga Operativa por Gerente de Distrito
               </h3>
-              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">
                 Representantes supervisados por líder.
               </p>
             </div>
-            <span className="text-[11px] font-bold text-[#0850FD] bg-[#0850FD]/10 px-2.5 py-0.5 rounded-full font-mono shrink-0">
+            <span className="text-[11px] sm:text-xs font-bold text-[#0850FD] bg-[#0850FD]/10 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full font-mono shrink-0">
               {activeGds.length} Líderes
             </span>
           </div>
 
-          <div className="space-y-2.5 pt-1">
+          <div className="space-y-2.5 sm:space-y-3 pt-1">
             {managerWorkload.map((m) => {
               const barWidth = (m.teamSize / maxManagerTeam) * 100;
               return (
@@ -258,7 +274,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     <span className="font-bold text-[#1A1A1E] group-hover:text-[#0850FD] transition-colors truncate min-w-0">
                       {m.nombre}
                     </span>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                       <span className="text-[10px] text-slate-400 font-medium">
                         {m.isCoordinator ? 'Coord.' : 'GD'}
                       </span>
@@ -268,7 +284,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="w-full h-2.5 bg-[#F8F4F2] rounded-full overflow-hidden p-0.5 border border-[#EAE5E1]/60">
+                  <div className="w-full h-2.5 sm:h-3 bg-[#F8F4F2] rounded-full overflow-hidden p-0.5 border border-[#EAE5E1]/60">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         m.isCoordinator
@@ -287,22 +303,22 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
 
         {/* Regional Share & Cohort Distribution */}
-        <div className="flex flex-col gap-3 w-full max-w-full">
+        <div className="lg:col-span-5 flex flex-col gap-3 sm:gap-6 w-full max-w-full">
           {/* Regional Share */}
-          <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs space-y-2.5 w-full max-w-full">
-            <h3 className="text-sm font-black text-[#1A1A1E] tracking-tight">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs space-y-2.5 sm:space-y-4 w-full max-w-full">
+            <h3 className="text-sm sm:text-base font-black text-[#1A1A1E] tracking-tight">
               Participación por Región Territorial
             </h3>
 
-            <div className="space-y-2">
+            <div className="space-y-2 sm:space-y-2.5">
               {regionDistribution.map((reg) => (
                 <div key={reg.region} className="flex items-center justify-between text-xs gap-2">
                   <span className="font-bold text-[#1A1A1E] truncate min-w-0">
                     {reg.region}
                   </span>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <span className="text-slate-400 font-mono text-[11px]">{reg.percent}%</span>
-                    <span className="px-2 py-0.5 rounded-full bg-[#F8F4F2] text-[#1A1A1E] font-mono font-bold text-[11px] min-w-[48px] text-right border border-[#EAE5E1]">
+                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-[#F8F4F2] text-[#1A1A1E] font-mono font-bold text-[11px] min-w-[48px] text-right border border-[#EAE5E1]">
                       {reg.count} reps
                     </span>
                   </div>
@@ -312,15 +328,15 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           </div>
 
           {/* Tenure & Antigüedad */}
-          <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs space-y-2.5 w-full max-w-full">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs space-y-2.5 sm:space-y-4 w-full max-w-full">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-[#1A1A1E] tracking-tight">
+              <h3 className="text-sm sm:text-base font-black text-[#1A1A1E] tracking-tight">
                 Cohortes de Antigüedad
               </h3>
               <Calendar className="w-4 h-4 text-slate-400" />
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 sm:space-y-3">
               {tenureCohorts.map((cohort) => {
                 const percent = Math.round((cohort.count / totalReps) * 100);
                 return (
@@ -345,23 +361,23 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         </div>
       </div>
 
-      {/* Row 3: Unit Breakdown - Single Column */}
-      <div className="bg-white rounded-2xl p-3 border border-[#EAE5E1] shadow-2xs space-y-2.5 w-full max-w-full">
-        <h3 className="text-sm font-black text-[#1A1A1E] tracking-tight">
+      {/* Row 3: Unit Breakdown (1 col on mobile, 2 on tablet, 4 on PC) */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs space-y-2.5 sm:space-y-4 w-full max-w-full">
+        <h3 className="text-sm sm:text-base font-black text-[#1A1A1E] tracking-tight">
           Desglose Completo por Unidades y Líneas de Negocio
         </h3>
-        <div className="grid grid-cols-1 gap-2 pt-1 w-full max-w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3.5 pt-1 w-full max-w-full">
           {unitStats.map((u) => (
             <div
               key={u.name}
-              className="p-2.5 rounded-xl bg-[#F8F4F2] border border-[#EAE5E1] flex items-center justify-between gap-2"
+              className="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-[#F8F4F2] border border-[#EAE5E1] flex sm:flex-col items-center sm:items-stretch justify-between gap-2"
             >
               <div className="text-xs font-black text-[#1A1A1E] leading-snug truncate">
                 {u.name}
               </div>
-              <div className="flex items-baseline gap-2 shrink-0">
-                <span className="text-base font-black text-[#0850FD] font-mono tabular-nums">
-                  {u.count} <span className="text-[11px] text-slate-500 font-bold">reps</span>
+              <div className="flex items-baseline justify-between gap-2 sm:mt-3 shrink-0">
+                <span className="text-base sm:text-2xl font-black text-[#0850FD] font-mono tabular-nums">
+                  {u.count} <span className="text-[11px] sm:text-xs text-slate-500 font-bold">reps</span>
                 </span>
                 <span className="text-xs font-bold text-slate-400 font-mono">
                   {u.percent}%

@@ -675,17 +675,17 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/50 backdrop-blur-xs overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs overflow-hidden"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-lg max-h-[96vh] flex flex-col overflow-x-hidden overflow-y-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-xl max-h-[96vh] sm:max-h-[92vh] flex flex-col overflow-x-hidden overflow-y-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Fixed Header */}
-        <div className="bg-gradient-to-r from-[#1A1A1E] to-[#2B2B36] text-white px-3.5 py-2.5 flex items-center justify-between shrink-0 w-full max-w-full">
+        <div className="bg-gradient-to-r from-[#1A1A1E] to-[#2B2B36] text-white px-3.5 sm:px-5 py-2.5 sm:py-3.5 flex items-center justify-between shrink-0 w-full max-w-full">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl theme-gradient-bg flex items-center justify-center text-white shadow-2xs shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl theme-gradient-bg flex items-center justify-center text-white shadow-2xs shrink-0">
               {isEditMode ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             </div>
             <div className="min-w-0">
@@ -708,8 +708,8 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
 
         {/* Form - Flex container with scrollable fields */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 w-full max-w-full overflow-hidden">
-          {/* Scrollable Fields Body - Single Column Stack */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 space-y-3 w-full max-w-full">
+          {/* Scrollable Fields Body (1 col on mobile, 2 cols on desktop) */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 space-y-3 sm:space-y-4 w-full max-w-full">
             {error && (
               <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 w-full">
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -724,8 +724,8 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
                 <span>Identificación y Contacto</span>
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5 w-full">
-                <div className="w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full">
+                <div className="w-full sm:col-span-2">
                   <label className="block text-xs font-bold text-[#1A1A1E] mb-1">
                     Nombre Completo <span className="text-theme-primary">*</span>
                   </label>
@@ -772,7 +772,7 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
                   />
                 </div>
 
-                <div className="w-full">
+                <div className="w-full sm:col-span-2">
                   <label className="block text-xs font-bold text-[#1A1A1E] mb-1 flex items-center gap-1">
                     <Mail className="w-3 h-3 text-theme-primary" />
                     <span>Correo Electrónico <span className="text-theme-primary">*</span></span>
@@ -804,8 +804,8 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
                     <span>Territorio y Ubicación</span>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-2.5 w-full">
-                    <div className="w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full">
+                    <div className="w-full sm:col-span-2">
                       <label className="block text-xs font-bold text-[#1A1A1E] mb-1">
                         Región <span className="text-theme-primary">*</span>
                       </label>
@@ -878,8 +878,8 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
                 <span>Unidad de Negocio y Liderazgo</span>
               </div>
 
-              <div className="grid grid-cols-1 gap-2.5 w-full">
-                <div className="w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full">
+                <div className="w-full sm:col-span-2">
                   <label className="block text-xs font-bold text-[#1A1A1E] mb-1">
                     Tipo de Representante <span className="text-theme-primary">*</span>
                   </label>
