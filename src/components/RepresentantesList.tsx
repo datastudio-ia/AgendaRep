@@ -64,13 +64,21 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
     const isComercial = isRepComercial(rep);
 
     return (
-      <div className="flex flex-col leading-tight whitespace-nowrap">
+      <div className="flex flex-col items-start gap-1 leading-tight whitespace-nowrap">
         <span className="font-bold text-[#1A1A1E] text-xs tracking-tight whitespace-nowrap">
           {unitName}
         </span>
-        <span className="text-[11px] font-medium mt-0.5 text-slate-500 whitespace-nowrap">
-          {isComercial ? 'Comercial' : 'Visita Médica'}
-        </span>
+        {isComercial ? (
+          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Comercial
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-300 shadow-2xs whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+            Visita Médica
+          </span>
+        )}
       </div>
     );
   };
@@ -93,23 +101,37 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EAE5E1] text-slate-700">
-              {reps.map((rep) => (
-                <tr
-                  key={rep.id}
-                  className="hover:bg-slate-50/80 transition-colors group"
-                >
-                  <td className="py-2.5 px-3">
-                    <button
-                      onClick={() => onSelectRep(rep)}
-                      className="text-left font-bold text-[#1A1A1E] group-hover:text-theme-primary transition-colors cursor-pointer"
-                    >
-                      {rep.nombre}
-                    </button>
-                  </td>
+              {reps.map((rep) => {
+                const isComercial = isRepComercial(rep);
+                return (
+                  <tr
+                    key={rep.id}
+                    className={`transition-colors group ${
+                      isComercial ? 'hover:bg-emerald-50/30' : 'hover:bg-blue-50/30'
+                    }`}
+                  >
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs ${
+                            isComercial
+                              ? 'bg-emerald-500 ring-2 ring-emerald-200'
+                              : 'bg-blue-500 ring-2 ring-blue-200'
+                          }`}
+                          title={isComercial ? 'Comercial (Verde)' : 'Visita Médica (Azul)'}
+                        />
+                        <button
+                          onClick={() => onSelectRep(rep)}
+                          className="text-left font-bold text-[#1A1A1E] group-hover:text-theme-primary transition-colors cursor-pointer"
+                        >
+                          {rep.nombre}
+                        </button>
+                      </div>
+                    </td>
 
-                  <td className="py-2.5 px-3 font-mono tabular-nums text-slate-600 font-medium">
-                    {rep.cedula || 'N/A'}
-                  </td>
+                    <td className="py-2.5 px-3 font-mono tabular-nums text-slate-600 font-medium">
+                      {rep.cedula || 'N/A'}
+                    </td>
 
                   <td className="py-2.5 px-3">
                     <div className="font-semibold text-[#1A1A1E]">{rep.ciudad}</div>
@@ -236,7 +258,8 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         </div>
@@ -250,6 +273,7 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 w-full max-w-full">
         {reps.map((rep) => {
           const isActive = isRepActive(rep);
+          const isComercial = isRepComercial(rep);
           const initials = rep.nombre
             .split(' ')
             .filter(Boolean)
@@ -261,14 +285,22 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
             <div
               key={rep.id}
               className={`bg-white rounded-2xl sm:rounded-3xl border w-full max-w-full overflow-hidden ${
-                !isActive ? 'border-dashed border-rose-300/80 bg-rose-50/15 opacity-85' : 'border-[#EAE5E1]'
-              } p-3 sm:p-5 shadow-2xs hover:border-theme-30 transition-all flex flex-col justify-between group`}
+                !isActive
+                  ? 'border-dashed border-rose-300/80 bg-rose-50/15 opacity-85'
+                  : 'border-[#EAE5E1]'
+              } p-3 sm:p-5 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between group`}
             >
               <div>
                 {/* Card top row */}
                 <div className="flex items-start justify-between gap-2.5">
                   <div className="flex items-start gap-2.5 min-w-0">
-                    <div className="w-8 h-8 rounded-xl theme-gradient-bg text-white flex items-center justify-center font-bold text-[11px] tracking-wider shrink-0 shadow-2xs">
+                    <div
+                      className={`w-8 h-8 rounded-xl text-white flex items-center justify-center font-bold text-[11px] tracking-wider shrink-0 shadow-2xs ${
+                        isComercial
+                          ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-2 ring-emerald-100'
+                          : 'bg-gradient-to-br from-blue-500 to-blue-600 ring-2 ring-blue-100'
+                      }`}
+                    >
                       {initials}
                     </div>
                     <div className="min-w-0">
@@ -279,7 +311,7 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
                       >
                         {rep.nombre}
                       </button>
-                      <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                      <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 mt-0.5 flex-wrap">
                         <span className="font-mono tabular-nums">C.I. {rep.cedula || 'N/A'}</span>
                         {!isActive && (
                           <span className="text-[9px] font-extrabold text-rose-600 bg-rose-50 px-1.5 py-0.2 rounded-full border border-rose-200">
@@ -370,11 +402,13 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
                     <Building className="w-3 h-3 text-theme-primary shrink-0" />
                     <span className="font-semibold text-[#1A1A1E]">{getMappedUnit(rep.unidadNegocio)}</span>
                     {isRepComercial(rep) ? (
-                      <span className="text-[9px] font-bold text-theme-secondary bg-theme-secondary-10 px-1.5 py-0.2 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         Comercial
                       </span>
                     ) : (
-                      <span className="text-[9px] font-bold text-theme-primary bg-theme-10 px-1.5 py-0.2 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-300 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                         Visita Médica
                       </span>
                     )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Representante, GerenteDistrito } from '../types/contact';
+import { Representante, GerenteDistrito, isRepComercial } from '../types/contact';
 import {
   X,
   Phone,
@@ -99,6 +99,22 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <Tag className="w-2.5 h-2.5 shrink-0" />
                     <span>Sector: {contact.codigoSector || 'N/A'}</span>
                   </div>
+                  {isRep && rep && (
+                    <div
+                      className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full border shadow-2xs ${
+                        isRepComercial(rep)
+                          ? 'bg-emerald-500/30 text-white border-emerald-300'
+                          : 'bg-blue-500/30 text-white border-blue-300'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isRepComercial(rep) ? 'bg-emerald-300' : 'bg-blue-300'
+                        }`}
+                      />
+                      <span>{isRepComercial(rep) ? 'Comercial' : 'Visita Médica'}</span>
+                    </div>
+                  )}
                   <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/95 bg-black/20 px-2 py-0.5 rounded-full border border-white/15">
                     <MapPin className="w-2.5 h-2.5 shrink-0 text-white/90" />
                     <span className="truncate max-w-[150px]">{locationDisplay}</span>
@@ -359,8 +375,23 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-none">
                   {isRep ? 'Unidad de Negocio' : 'Cargo / Rol'}
                 </div>
-                <div className="text-sm font-bold text-[#1A1A1E] truncate mt-0.5">
-                  {unidadDisplay}
+                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                  <span className="text-sm font-bold text-[#1A1A1E] truncate">
+                    {unidadDisplay}
+                  </span>
+                  {isRep && rep && (
+                    isRepComercial(rep) ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-300 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Comercial
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-300 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        Visita Médica
+                      </span>
+                    )
+                  )}
                 </div>
               </div>
             </div>

@@ -51,12 +51,14 @@ interface FilterBarProps {
   onClearFilters: () => void;
   totalFiltered: number;
   totalOriginal: number;
+  hideSearchAndViewMode?: boolean;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
   searchTerm,
   onSearchChange,
   showFilters = true,
+  hideSearchAndViewMode = false,
   selectedTypes = [],
   onTypesChange,
   typeOptions,
@@ -92,90 +94,96 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   return (
     <div className="w-full max-w-full md:max-w-[1440px] mx-auto px-2.5 sm:px-6 lg:px-8 pt-2 sm:pt-3 pb-1">
       <div className="bg-white/95 rounded-2xl sm:rounded-3xl border border-[#EAE5E1] p-2.5 sm:p-4 shadow-2xs flex flex-col gap-2.5 sm:gap-3 w-full max-w-full">
-        {/* Row 1: Search and Actions */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-3 w-full max-w-full">
-          {/* Smart Search box */}
-          <div className="relative flex-1 w-full max-w-full">
-            <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-primary" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder={
-                showFilters
-                  ? 'Buscar nombre, cédula, ciudad, teléfono...'
-                  : 'Buscar líder, cédula, cargo, región...'
-              }
-              className="w-full max-w-full pl-9 sm:pl-10 pr-8 sm:pr-9 py-2 sm:py-2.5 text-sm bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl sm:rounded-full focus:bg-white focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent transition-all placeholder:text-slate-400 font-medium text-[#1A1A1E]"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-                title="Limpiar búsqueda"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Action cluster: View Mode & Export */}
-          <div className="grid grid-cols-3 sm:flex sm:flex-wrap sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto max-w-full">
-            {/* View Mode Switcher */}
-            <div className="grid grid-cols-2 sm:inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1]">
-              <button
-                onClick={() => onViewModeChange('grid')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-2 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'grid'
-                    ? 'bg-theme-primary text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-theme-primary'
-                }`}
-                title="Vista Tarjetas"
-              >
-                <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Tarjetas</span>
-              </button>
-              <button
-                onClick={() => onViewModeChange('table')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-2 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'table'
-                    ? 'bg-theme-primary text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-theme-primary'
-                }`}
-                title="Vista Tabla"
-              >
-                <Table2 className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Tabla</span>
-              </button>
+        {/* Row 1: Search and Actions (rendered only if not hidden) */}
+        {!hideSearchAndViewMode && (
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 sm:gap-3 w-full max-w-full">
+            {/* Smart Search box */}
+            <div className="relative flex-1 w-full max-w-full">
+              <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-primary" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder={
+                  showFilters
+                    ? 'Buscar nombre, cédula, ciudad, teléfono...'
+                    : 'Buscar líder, cédula, cargo, región...'
+                }
+                className="w-full max-w-full pl-9 sm:pl-10 pr-8 sm:pr-9 py-2 sm:py-2.5 text-sm bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl sm:rounded-full focus:bg-white focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent transition-all placeholder:text-slate-400 font-medium text-[#1A1A1E]"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => onSearchChange('')}
+                  className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  title="Limpiar búsqueda"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
-            {/* Export Excel (.xlsx) Button */}
-            <button
-              onClick={onExportExcel || onExportCsv}
-              className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 rounded-xl sm:rounded-full transition-all cursor-pointer truncate shadow-2xs"
-              title="Descargar Agenda de Representantes (.xlsx)"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="truncate">Excel</span>
-            </button>
+            {/* Action cluster: View Mode & Export */}
+            <div className="grid grid-cols-3 sm:flex sm:flex-wrap sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto max-w-full">
+              {/* View Mode Switcher */}
+              <div className="grid grid-cols-2 sm:inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1]">
+                <button
+                  onClick={() => onViewModeChange('grid')}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-theme-primary text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-theme-primary'
+                  }`}
+                  title="Vista Tarjetas"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Tarjetas</span>
+                </button>
+                <button
+                  onClick={() => onViewModeChange('table')}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'table'
+                      ? 'bg-theme-primary text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-theme-primary'
+                  }`}
+                  title="Vista Tabla"
+                >
+                  <Table2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Tabla</span>
+                </button>
+              </div>
 
-            {/* Export PDF Button */}
-            {onOpenPdfModal && (
+              {/* Export Excel (.xlsx) Button */}
               <button
-                onClick={onOpenPdfModal}
-                className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#FF4800] to-[#FF8F32] hover:opacity-90 rounded-xl sm:rounded-full transition-all cursor-pointer shadow-2xs truncate"
-                title="Exportar a PDF / Imprimir"
+                onClick={onExportExcel || onExportCsv}
+                className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 rounded-xl sm:rounded-full transition-all cursor-pointer truncate shadow-2xs"
+                title="Descargar Agenda de Representantes (.xlsx)"
               >
-                <Printer className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">PDF</span>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">Excel</span>
               </button>
-            )}
+
+              {/* Export PDF Button */}
+              {onOpenPdfModal && (
+                <button
+                  onClick={onOpenPdfModal}
+                  className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#FF4800] to-[#FF8F32] hover:opacity-90 rounded-xl sm:rounded-full transition-all cursor-pointer shadow-2xs truncate"
+                  title="Exportar a PDF / Imprimir"
+                >
+                  <Printer className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">PDF</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Row 2: Multi-select Faceted Filters (1 column on mobile, horizontal wrap on sm+) */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 pt-2 border-t border-[#EAE5E1] w-full max-w-full">
+          <div
+            className={`grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2 w-full max-w-full ${
+              !hideSearchAndViewMode ? 'pt-2 border-t border-[#EAE5E1]' : ''
+            }`}
+          >
             {/* 1. Tipo de Representante */}
             {typeOptions && onTypesChange && (
               <MultiSelectDropdown

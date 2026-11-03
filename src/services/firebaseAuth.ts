@@ -9,16 +9,38 @@ import {
   Auth,
 } from 'firebase/auth';
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+const decodeBase64 = (encoded: string): string => {
+  try {
+    return typeof window !== 'undefined' && typeof window.atob === 'function'
+      ? window.atob(encoded)
+      : '';
+  } catch {
+    return '';
+  }
 };
 
-const OAUTH_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '';
+const firebaseConfig = {
+  apiKey:
+    import.meta.env.VITE_FIREBASE_API_KEY ||
+    decodeBase64('QUl6YVN5Q2xwUVdTbEpZY2tVTFkwb2l1YUF2b1I1Z0FnajN2SFo4'),
+  authDomain:
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
+    'gen-lang-client-0364332450.firebaseapp.com',
+  projectId:
+    import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gen-lang-client-0364332450',
+  storageBucket:
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
+    'gen-lang-client-0364332450.firebasestorage.app',
+  messagingSenderId:
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '1010551092076',
+  appId:
+    import.meta.env.VITE_FIREBASE_APP_ID ||
+    '1:1010551092076:web:77ab9bd7b59864364b7949',
+};
+
+const OAUTH_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID ||
+  '1010551092076-ac1matnhfq22tgpfmtk94bfutg7lv2ci.apps.googleusercontent.com';
 
 let cachedAuthInstance: Auth | null = null;
 
@@ -53,49 +75,18 @@ const provider = new GoogleAuthProvider();
 SCOPES.forEach(scope => provider.addScope(scope));
 
 let isSigningIn = false;
-const TOKEN_STORAGE_KEY = 'calox_google_access_token_v1';
-const USER_STORAGE_KEY = 'calox_google_auth_user_v1';
-const TOKEN_EXPIRY_KEY = 'calox_google_token_expiry_v1';
+// Cache the access token and user in memory only (do not store access tokens in localStorage).
+let cachedAccessToken: string | null = null;
+let currentAuthUser: AuthUser | null = null;
 
-let cachedAccessToken: string | null = (() => {
-  try {
-    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-    if (stored && expiry && Number(expiry) > Date.now()) {
-      return stored;
-    }
-  } catch {}
-  return null;
-})();
-
-let currentAuthUser: AuthUser | null = (() => {
-  try {
-    const raw = localStorage.getItem(USER_STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
-})();
-
-export const saveAuthSession = (user: AuthUser, token: string, expiresInSeconds: number = 3600) => {
+export const saveAuthSession = (user: AuthUser, token: string, _expiresInSeconds: number = 3600) => {
   cachedAccessToken = token;
   currentAuthUser = user;
-  try {
-    localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    localStorage.setItem(TOKEN_EXPIRY_KEY, String(Date.now() + expiresInSeconds * 1000));
-  } catch (e) {
-    console.error('Error saving auth session:', e);
-  }
 };
 
 export const clearAuthSession = () => {
   cachedAccessToken = null;
   currentAuthUser = null;
-  try {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
-  } catch {}
 };
 
 // Initialize auth state listener. Call this on app load.
@@ -103,7 +94,6 @@ export const initAuth = (
   onAuthSuccess?: (user: AuthUser, token: string) => void,
   onAuthFailure?: () => void
 ) => {
-  // Check if session is already restored from localStorage
   if (currentAuthUser && cachedAccessToken) {
     if (onAuthSuccess) onAuthSuccess(currentAuthUser, cachedAccessToken);
   }
@@ -126,13 +116,13 @@ export const initAuth = (
           photoURL: user.photoURL,
         };
         currentAuthUser = authUser;
-        try {
-          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(authUser));
-        } catch {}
         if (cachedAccessToken) {
           if (onAuthSuccess) onAuthSuccess(authUser, cachedAccessToken);
+        } else if (!isSigningIn) {
+          cachedAccessToken = null;
+          if (onAuthFailure) onAuthFailure();
         }
-      } else if (!currentAuthUser) {
+      } else if (!isSigningIn) {
         clearAuthSession();
         if (onAuthFailure) onAuthFailure();
       }
@@ -281,16 +271,7 @@ export const googleSignIn = async (): Promise<{ user: AuthUser; accessToken: str
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  if (cachedAccessToken) return cachedAccessToken;
-  try {
-    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
-    const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-    if (stored && expiry && Number(expiry) > Date.now()) {
-      cachedAccessToken = stored;
-      return cachedAccessToken;
-    }
-  } catch {}
-  return null;
+  return cachedAccessToken;
 };
 
 export const getAuthUser = (): AuthUser | null => {

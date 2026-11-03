@@ -13,7 +13,6 @@ import {
 import { Header } from './components/Header';
 import { MetricStrip } from './components/MetricStrip';
 import { TypeSelector } from './components/TypeSelector';
-import { FilterBar } from './components/FilterBar';
 import { RepresentantesList } from './components/RepresentantesList';
 import { GerentesList } from './components/GerentesList';
 import { HierarchyTree } from './components/HierarchyTree';
@@ -43,7 +42,21 @@ import {
 } from './services/sheetsService';
 import { exportToCsvFile } from './utils/phoneUtils';
 import { exportRepsToExcel, exportGdsToExcel, getStandardRegion } from './utils/excelExport';
-import { Pill, CheckCircle2, AlertCircle, Info, RefreshCw, X, Plus, Pencil } from 'lucide-react';
+import {
+  Pill,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  RefreshCw,
+  X,
+  Plus,
+  Pencil,
+  Users,
+  Search,
+  LayoutGrid,
+  Table2,
+  FileSpreadsheet,
+} from 'lucide-react';
 
 export const REGION_OPTIONS = [
   'CAPITAL ESTE',
@@ -1017,50 +1030,12 @@ export default function App() {
         countRegionesSinReps={9}
       />
 
-      {/* 3. Filter Bar (for Reps and GDs tabs) */}
-      {(activeTab === 'reps' || activeTab === 'gds') && (
-        <FilterBar
-          showFilters={activeTab === 'reps'}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          selectedTypes={selectedTypes}
-          onTypesChange={setSelectedTypes}
-          typeOptions={typeSelectOptions}
-          selectedRegions={selectedRegions}
-          onRegionsChange={setSelectedRegions}
-          regionOptions={regionSelectOptions}
-          selectedUnits={activeTab === 'reps' ? selectedUnits : undefined}
-          onUnitsChange={activeTab === 'reps' ? setSelectedUnits : undefined}
-          unitOptions={activeTab === 'reps' ? unitSelectOptions : undefined}
-          selectedGerentes={selectedGerentes}
-          onGerentesChange={setSelectedGerentes}
-          gerenteOptions={gerenteSelectOptions}
-          selectedCoordinadores={selectedCoordinadores}
-          onCoordinadoresChange={setSelectedCoordinadores}
-          coordinadorOptions={coordinadorSelectOptions}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onExportExcel={handleExportExcel}
-          onOpenPdfModal={() => setIsPdfModalOpen(true)}
-          onClearFilters={handleClearFilters}
-          totalFiltered={
-            activeTab === 'reps'
-              ? filteredReps.filter((r) => isRepActive(r)).length
-              : filteredGds.filter((g) => isGdActive(g)).length
-          }
-          totalOriginal={
-            activeTab === 'reps'
-              ? activeRepsData.length
-              : activeGdsData.length
-          }
-        />
-      )}
 
       {/* 4. Main Body Container */}
       <main className="flex-1 w-full max-w-full md:max-w-[1440px] overflow-x-hidden mx-auto px-2.5 sm:px-6 lg:px-8 py-2.5 sm:py-6 flex flex-col">
         {activeTab === 'reps' && (
           <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full">
-            {/* Directorio Unificado de Representantes */}
+            {/* Directorio Unificado de Representantes con Buscador, Modo y Filtros integrados */}
             <TypeSelector
               reps={filteredReps}
               repsComerciales={repsComerciales}
@@ -1084,28 +1059,128 @@ export default function App() {
               linkedSheet={linkedSheet}
               onAutoConnect={handleAutoConnect}
               isAutoConnecting={isAutoConnecting}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onViewModeChange={setViewMode}
+              onExportExcel={handleExportExcel}
+              onOpenPdfModal={() => setIsPdfModalOpen(true)}
+              showFilters={true}
+              selectedTypes={selectedTypes}
+              onTypesChange={setSelectedTypes}
+              typeOptions={typeSelectOptions}
+              selectedRegions={selectedRegions}
+              onRegionsChange={setSelectedRegions}
+              regionOptions={regionSelectOptions}
+              selectedUnits={selectedUnits}
+              onUnitsChange={setSelectedUnits}
+              unitOptions={unitSelectOptions}
+              selectedGerentes={selectedGerentes}
+              onGerentesChange={setSelectedGerentes}
+              gerenteOptions={gerenteSelectOptions}
+              selectedCoordinadores={selectedCoordinadores}
+              onCoordinadoresChange={setSelectedCoordinadores}
+              coordinadorOptions={coordinadorSelectOptions}
+              onClearFilters={handleClearFilters}
             />
           </div>
         )}
 
         {activeTab === 'gds' && (
           <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full">
-            <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-xs w-full max-w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
-              <div>
-                <h1 className="text-base sm:text-xl font-black text-[#1A1A1E] tracking-tight leading-snug">
-                  Gerentes de Distrito y Coordinadores
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                  Líderes de gerencias de distrito, comercialización y trade marketing.
-                </p>
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 sm:gap-5 w-full max-w-full">
+              {/* Fila superior: Título con ícono y Botón Agregar GD / Coordinador */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 w-full">
+                <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl theme-gradient-bg text-white flex items-center justify-center shadow-2xs shrink-0">
+                    <Users className="w-4 h-4 sm:w-6 sm:h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-xl font-black text-[#1A1A1E] tracking-tight truncate">
+                      Gerentes de Distrito y Coordinadores
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                      Líderes de gerencias de distrito, comercialización y trade marketing.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botón de acción: Nuevo GD / Coordinador */}
+                <button
+                  onClick={handleOpenCreateGd}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0"
+                  title="Agregar nuevo GD o Coordinador"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span>Nuevo GD / Coordinador</span>
+                </button>
               </div>
-              <button
-                onClick={handleOpenCreateGd}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white rounded-xl sm:rounded-full font-bold text-sm transition-all shadow-xs cursor-pointer shrink-0"
-              >
-                <Plus className="w-4 h-4 shrink-0" />
-                <span>Nuevo Líder / GD</span>
-              </button>
+
+              {/* Fila inferior: Buscador, Selector de Modo y Botón Exportar a Excel */}
+              <div className="pt-2 sm:pt-4 border-t border-[#EAE5E1]/80 w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
+                {/* Panel de búsqueda */}
+                <div className="relative flex-1 w-full max-w-full">
+                  <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-primary" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar líder, cédula, cargo, región..."
+                    className="w-full max-w-full pl-9 sm:pl-10 pr-8 sm:pr-9 py-2 sm:py-2.5 text-sm bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl sm:rounded-full focus:bg-white focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent transition-all placeholder:text-slate-400 font-medium text-[#1A1A1E]"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      title="Limpiar búsqueda"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Selector de modo tarjeta o tabla y Exportar a Excel */}
+                <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap sm:flex-nowrap shrink-0">
+                  <div className="inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1] shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('grid')}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+                        viewMode === 'grid'
+                          ? 'bg-theme-primary text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-theme-primary'
+                      }`}
+                      title="Ver en cuadrícula de tarjetas"
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <span>Tarjetas</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('table')}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+                        viewMode === 'table'
+                          ? 'bg-theme-primary text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-theme-primary'
+                      }`}
+                      title="Ver en formato tabla compacta"
+                    >
+                      <Table2 className="w-3.5 h-3.5" />
+                      <span>Tabla</span>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 sm:px-3.5 rounded-xl sm:rounded-full border border-emerald-300 text-xs font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400 transition-all cursor-pointer shadow-2xs shrink-0"
+                    title="Exportar a Excel (.xlsx)"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Excel</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <GerentesList
