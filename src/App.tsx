@@ -1026,8 +1026,8 @@ export default function App() {
         countPharmetique={totalPharmetique}
         countOtc={totalOtc}
         countRegiones={REGION_OPTIONS.length}
-        countRegionesCubiertas={15}
-        countRegionesSinReps={9}
+        countRegionesCubiertas={14}
+        countRegionesSinReps={10}
       />
 
 

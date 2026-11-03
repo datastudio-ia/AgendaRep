@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { Representante, GerenteDistrito, ViewMode, isRepComercial, isRepActive } from '../types/contact';
+import { Representante, GerenteDistrito, ViewMode, isRepComercial, isRepActive, isGdActive } from '../types/contact';
 import {
   MapPin,
   Users,
@@ -712,7 +712,9 @@ const VenezuelaVectorMap: React.FC<VenezuelaVectorMapProps> = React.memo(
                 {hoveredState.totalReps} Representantes
               </span>
               <span className="text-slate-300 text-[10px]">
-                {hoveredState.comerciales} Com / {hoveredState.visitaMedica} Méd
+                {hoveredState.comerciales > 0
+                  ? `${hoveredState.comerciales} Com / ${hoveredState.visitaMedica} Méd`
+                  : `${hoveredState.visitaMedica} Visita Médica`}
               </span>
             </div>
             {hoveredState.unitBreakdown.length > 0 && (
@@ -1237,8 +1239,61 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
     handleSelectState(null);
   }, [handleSelectState]);
 
-  // Contabilizar ÚNICAMENTE representantes activos (no inactivos)
-  const activeReps = useMemo(() => reps.filter((r) => isRepActive(r)), [reps]);
+  // 1. Filtrar líderes territoriales: ÚNICAMENTE Gerentes de Distrito activos (excluyendo Coordinadores)
+  const districtManagers = useMemo(() => {
+    return gds.filter((g) => {
+      if (!isGdActive(g)) return false;
+      const cargo = (g.cargo || '').toUpperCase();
+      return cargo.includes('GERENTE') && !cargo.includes('COORDINADOR');
+    });
+  }, [gds]);
+
+  // Función de coincidencia entre el gerenteDistrito del representante y el Gerente de Distrito
+  const matchesDistrictManager = useCallback((repManager: string, gdName: string): boolean => {
+    if (!repManager || !gdName) return false;
+    const m = repManager.toUpperCase().trim();
+    const t = gdName.toUpperCase().trim();
+    if (m.includes(t) || t.includes(m)) return true;
+    if (t.includes('RICARDO GUEVARA') && m.includes('CENTRO VACANTE')) return true;
+    if ((t.includes('ORIENTE') || t.includes('EI-LING')) && (m.includes('EI-LING') || m.includes('ORIENTE'))) return true;
+    return false;
+  }, []);
+
+  // 2. Contabilizar ÚNICAMENTE representantes activos que pertenecen a dichos Gerentes de Distrito
+  const activeReps = useMemo(() => {
+    const knownCoordinadores = [
+      'DANA RIERA',
+      'JUAN MENDEZ',
+      'KERVIN PALOMO',
+      'VICTORIA HERNANDEZ',
+      'YESSICA NOGUERA',
+    ];
+    const knownDistrictManagers = [
+      'ANDREA ALARCON',
+      'MARAHY CHURION',
+      'RANDOLPH GRAMCKO',
+      'RICARDO GUEVARA',
+      'TONNY ESPINOZA',
+      'JHOSELYN SANCHEZ',
+      'GD ORIENTE VACANTE',
+    ];
+
+    return reps.filter((r) => {
+      if (!isRepActive(r)) return false;
+      const rMgr = (r.gerenteDistrito || '').toUpperCase().trim();
+      if (!rMgr) return false;
+
+      // Excluir representantes supervisados por Coordinadores Comerciales / Trade Marketing
+      const isUnderCoord = knownCoordinadores.some((c) => rMgr.includes(c));
+      if (isUnderCoord) return false;
+
+      // Validar si pertenece a un Gerente de Distrito activo o registrado
+      const belongsToActiveGd = districtManagers.some((gd) => matchesDistrictManager(rMgr, gd.nombre));
+      if (belongsToActiveGd) return true;
+
+      return knownDistrictManagers.some((gdName) => matchesDistrictManager(rMgr, gdName));
+    });
+  }, [reps, districtManagers, matchesDistrictManager]);
 
   // Pre-indexar los estados que corresponden a cada representante UNA sola vez (O(1) lookup)
   const repMatchedStatesMap = useMemo(() => {
@@ -1355,7 +1410,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
         matchedReps.map((r) => r.gerenteDistrito?.toUpperCase().trim()).filter(Boolean)
       );
 
-      const matchedGds = gds.filter((g) => {
+      const matchedGds = districtManagers.filter((g) => {
         const gdNameUpper = g.nombre?.toUpperCase().trim();
         for (const rName of repManagerNames) {
           if (rName.includes(gdNameUpper) || gdNameUpper.includes(rName)) return true;
@@ -1435,7 +1490,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
         (r) => normalizeReg(r.region) === cleanTarget && isRepComercial(r)
       ).length;
       const medCount = totalReps - comCount;
-      const leadersCount = gds.filter(
+      const leadersCount = districtManagers.filter(
         (g) => normalizeReg(g.region) === cleanTarget
       ).length;
 
@@ -1448,7 +1503,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
         leadersCount,
       };
     });
-  }, [enrichedStates, typeFilteredReps, gds]);
+  }, [enrichedStates, typeFilteredReps, districtManagers]);
 
   // Filtered reps in active state inspector
   const filteredActiveReps = useMemo(() => {
@@ -1485,6 +1540,9 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
             <h2 className="text-base sm:text-xl font-black text-[#1A1A1E] tracking-tight truncate">
               Mapa Territorial por Regiones
             </h2>
+            <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+              Supervisión de Gerentes de Distrito y representantes adscritos.
+            </p>
           </div>
         </div>
 
@@ -1595,12 +1653,12 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
                 </div>
               </div>
 
-              {/* District Manager(s) / Coordinador(es) */}
+              {/* District Manager(s) */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-[#0850FD]" />
-                    <span>Gerente de Distrito / Liderazgo</span>
+                    <span>Gerente de Distrito</span>
                   </h4>
                   <span className="text-[10px] font-bold text-slate-400">
                     {activeState.gdsList.length > 0
@@ -1714,26 +1772,34 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
                     <span>Representantes Asignados ({filteredActiveReps.length})</span>
                   </h4>
                   <div className="flex items-center gap-1.5 text-[10px] font-bold font-mono">
-                    <button
-                      onClick={() => setRepFilterType(repFilterType === 'comercial' ? 'all' : 'comercial')}
-                      className={`px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                        repFilterType === 'comercial'
-                          ? 'bg-emerald-600 text-white border-emerald-600'
-                          : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
-                      }`}
-                    >
-                      {activeState.comerciales} Com
-                    </button>
-                    <button
-                      onClick={() => setRepFilterType(repFilterType === 'medica' ? 'all' : 'medica')}
-                      className={`px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                        repFilterType === 'medica'
-                          ? 'bg-[#0850FD] text-white border-[#0850FD]'
-                          : 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100'
-                      }`}
-                    >
-                      {activeState.visitaMedica} Méd
-                    </button>
+                    {activeState.comerciales > 0 ? (
+                      <>
+                        <button
+                          onClick={() => setRepFilterType(repFilterType === 'comercial' ? 'all' : 'comercial')}
+                          className={`px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                            repFilterType === 'comercial'
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                          }`}
+                        >
+                          {activeState.comerciales} Com
+                        </button>
+                        <button
+                          onClick={() => setRepFilterType(repFilterType === 'medica' ? 'all' : 'medica')}
+                          className={`px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                            repFilterType === 'medica'
+                              ? 'bg-[#0850FD] text-white border-[#0850FD]'
+                              : 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100'
+                          }`}
+                        >
+                          {activeState.visitaMedica} Méd
+                        </button>
+                      </>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 font-mono text-[10px] font-bold">
+                        {activeState.visitaMedica} Visita Médica
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1780,7 +1846,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
                         ? `El estado ${activeState.name} no cuenta con representantes de tipo ${
                             repFilterType === 'comercial' ? 'Comercial' : 'Visita Medica'
                           } asignados.`
-                        : `El estado ${activeState.name} no cuenta actualmente con representantes de ventas o visita médica en la plantilla activa.`}
+                        : `El estado ${activeState.name} no cuenta actualmente con representantes adscritos a esta gerencia de distrito.`}
                     </p>
                   </div>
                 )}
@@ -1795,7 +1861,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
               <div>
                 <h3 className="text-lg font-black text-[#1A1A1E]">Selecciona un Estado en el Mapa</h3>
                 <p className="text-xs text-slate-500 font-medium max-w-xs mx-auto mt-1">
-                  Haz clic en cualquier estado sombreado para inspeccionar su fuerza de ventas, gerentes de distrito y coordinadores asignados.
+                  Haz clic en cualquier estado sombreado para inspeccionar su fuerza de ventas y el Gerente de Distrito asignado.
                 </p>
               </div>
               <button
