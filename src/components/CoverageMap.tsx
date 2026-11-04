@@ -154,34 +154,66 @@ export const REGIONS_CONFIG: Record<string, RegionConfig> = {
   },
 };
 
+export const REGION_GD_CANONICAL: Record<string, string> = {
+  '1 - ANDES': 'ANDREA ALARCON',
+  '2 - CAPITAL ESTE': 'RANDOLPH GRAMCKO',
+  '3 - CAPITAL OESTE': 'MARAHY CHURION',
+  '4 - CENTRO': 'RICARDO GUEVARA',
+  '5 - CENTRO OCCIDENTE': 'TONNY ESPINOZA',
+  '6 - OCCIDENTE': 'JHOSELYN SANCHEZ',
+  '7 - ORIENTE': 'GD ORIENTE VACANTE',
+};
+
+export const isTradeMarketingLeader = (g: { cargo?: string; nombre?: string }): boolean => {
+  const cargo = (g.cargo || '').toUpperCase();
+  const name = (g.nombre || '').toUpperCase();
+  return (
+    cargo.includes('TRADE MARKETING') ||
+    cargo.includes('TRADE') ||
+    name.includes('YESSICA NOGUERA') ||
+    name.includes('JUAN MENDEZ')
+  );
+};
+
+export const matchLeaderName = (repManager?: string | null, leaderName?: string | null): boolean => {
+  if (!repManager || !leaderName) return false;
+  const m = repManager.toUpperCase().trim();
+  const t = leaderName.toUpperCase().trim();
+  if (m === t || m.includes(t) || t.includes(m)) return true;
+  if (t.includes('RICARDO GUEVARA') && m.includes('CENTRO VACANTE')) return true;
+  if ((t.includes('ORIENTE') || t.includes('EI-LING')) && (m.includes('EI-LING') || m.includes('ORIENTE'))) return true;
+  return false;
+};
+
 export function resolveRegionCodeFromRaw(rawRegion?: string | null): string | null {
   if (!rawRegion) return null;
   const clean = rawRegion
     .toUpperCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/^\d+\s*-\s*/, '')
     .trim();
 
-  if (clean === 'CENTRO OCCIDENTE' || clean === 'CENTRO-OCCIDENTE' || (clean.includes('CENTRO') && clean.includes('OCCIDENTE'))) {
-    return '5 - CENTRO OCCIDENTE';
-  }
-  if (clean === 'CAPITAL ESTE' || clean === 'CAPITAL-ESTE' || (clean.includes('CAPITAL') && clean.includes('ESTE'))) {
-    return '2 - CAPITAL ESTE';
-  }
-  if (clean === 'CAPITAL OESTE' || clean === 'CAPITAL-OESTE' || (clean.includes('CAPITAL') && clean.includes('OESTE'))) {
-    return '3 - CAPITAL OESTE';
-  }
-  if (clean === 'ANDES' || clean.includes('ANDE')) {
+  // 1. Coincidencia por prefijo numérico exacto o palabras clave delimitadas
+  if (clean.startsWith('1') || clean.includes('ANDES')) {
     return '1 - ANDES';
   }
-  if (clean === 'CENTRO' || clean.startsWith('CENTRO')) {
+  // IMPORTANTE: evaluar OESTE antes que ESTE para evitar que "CAPITAL OESTE" coincida con "ESTE"
+  if (clean.startsWith('3') || clean.includes('OESTE') || clean === 'CAPITAL OESTE') {
+    return '3 - CAPITAL OESTE';
+  }
+  if (clean.startsWith('2') || (clean.includes('CAPITAL') && /\bESTE\b/.test(clean)) || clean === 'CAPITAL ESTE') {
+    return '2 - CAPITAL ESTE';
+  }
+  if (clean.startsWith('5') || (clean.includes('CENTRO') && clean.includes('OCCIDENTE'))) {
+    return '5 - CENTRO OCCIDENTE';
+  }
+  if (clean.startsWith('4') || clean === 'CENTRO' || clean.startsWith('CENTRO')) {
     return '4 - CENTRO';
   }
-  if (clean === 'OCCIDENTE' || clean.includes('OCCIDENTE')) {
+  if (clean.startsWith('6') || clean.includes('OCCIDENTE')) {
     return '6 - OCCIDENTE';
   }
-  if (clean === 'ORIENTE' || clean.includes('ORIENTE')) {
+  if (clean.startsWith('7') || clean.includes('ORIENTE')) {
     return '7 - ORIENTE';
   }
   return null;
@@ -1242,8 +1274,11 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
   // 1. Representantes activos (contabiliza tanto comerciales como visita médica por estado)
   const activeReps = useMemo(() => reps.filter((r) => isRepActive(r)), [reps]);
 
-  // 2. Líderes territoriales activos (contabiliza Gerentes de Distrito y Coordinadores por estado)
-  const activeGds = useMemo(() => gds.filter((g) => isGdActive(g)), [gds]);
+  // 2. Líderes del mapa territorial: se excluyen terminantemente coordinadores de trade marketing
+  // y se consideran gerentes de distrito y coordinadores comerciales
+  const mapLeaders = useMemo(() => {
+    return gds.filter((g) => !isTradeMarketingLeader(g));
+  }, [gds]);
 
   // Pre-indexar los estados que corresponden a cada representante UNA sola vez (O(1) lookup)
   const repMatchedStatesMap = useMemo(() => {
@@ -1356,35 +1391,28 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
       const regionConf = resolvedRegionCode ? REGIONS_CONFIG[resolvedRegionCode] || null : null;
       const resolvedRegionName = regionConf?.name || st.regionName;
 
-      const repManagerNames = new Set(
-        matchedReps.map((r) => r.gerenteDistrito?.toUpperCase().trim()).filter(Boolean)
-      );
+      // 1. Exactamente 1 Gerente de Distrito para este estado / región
+      const canonicalGdName = resolvedRegionCode ? REGION_GD_CANONICAL[resolvedRegionCode] : null;
+      const stateGd = mapLeaders.find((g) => {
+        if (!g.cargo.toUpperCase().includes('GERENTE')) return false;
+        if (canonicalGdName && matchLeaderName(canonicalGdName, g.nombre)) return true;
+        return matchedReps.some((r) => matchLeaderName(r.gerenteDistrito, g.nombre));
+      }) || (canonicalGdName ? mapLeaders.find((g) => matchLeaderName(canonicalGdName, g.nombre)) : null);
 
-      const matchedGds = activeGds.filter((g) => {
-        const gdNameUpper = g.nombre?.toUpperCase().trim();
-        for (const rName of repManagerNames) {
-          if (rName.includes(gdNameUpper) || gdNameUpper.includes(rName)) return true;
-          if (gdNameUpper.includes('RICARDO GUEVARA') && rName.includes('CENTRO VACANTE')) return true;
-          if ((gdNameUpper.includes('ORIENTE') || gdNameUpper.includes('EI-LING')) && (rName.includes('EI-LING') || rName.includes('ORIENTE'))) return true;
-        }
-        if (resolvedRegionCode && g.region) {
-          const gdRegCode = resolveRegionCodeFromRaw(g.region);
-          if (gdRegCode === resolvedRegionCode || g.region.toUpperCase().includes(resolvedRegionName.toUpperCase())) {
-            return true;
-          }
-        }
-        if (g.estado && (g.estado.toUpperCase().includes(st.name.toUpperCase()) || st.name.toUpperCase().includes(g.estado.toUpperCase()))) {
-          return true;
-        }
-        return false;
+      // 2. Coordinador(es) comercial(es) que TENGAN representantes asignados en este estado (excluyendo Trade Marketing)
+      const stateCoords = mapLeaders.filter((g) => {
+        if (!g.cargo.toUpperCase().includes('COORDINADOR')) return false;
+        if (isTradeMarketingLeader(g)) return false;
+        return matchedReps.some((r) => matchLeaderName(r.gerenteDistrito, g.nombre));
       });
 
-      // Ordenar: Gerentes de Distrito primero, luego Coordinadores
-      matchedGds.sort((a, b) => {
-        const aIsGd = a.cargo.toUpperCase().includes('GERENTE') ? 0 : 1;
-        const bIsGd = b.cargo.toUpperCase().includes('GERENTE') ? 0 : 1;
-        if (aIsGd !== bIsGd) return aIsGd - bIsGd;
-        return a.nombre.localeCompare(b.nombre, 'es');
+      // Ensamblar líderes: exactamente 1 GD primero, luego Coordinador(es) con representantes
+      const matchedGds: GerenteDistrito[] = [];
+      if (stateGd) matchedGds.push(stateGd);
+      stateCoords.forEach((c) => {
+        if (!matchedGds.some((m) => m.id === c.id)) {
+          matchedGds.push(c);
+        }
       });
 
       return {
@@ -1425,7 +1453,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
         })(),
       };
     });
-  }, [typeFilteredReps, activeReps, activeGds, repMatchedStatesMap]);
+  }, [typeFilteredReps, activeReps, mapLeaders, repMatchedStatesMap]);
 
   // Selected state details
   const activeState = useMemo(() => {
@@ -1446,19 +1474,28 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
       const statesInRegion = enrichedStates.filter(
         (s) => normalizeReg(s.region) === cleanTarget && s.hasReps
       );
-      const totalReps = typeFilteredReps.filter(
+      const repsInRegion = typeFilteredReps.filter(
         (r) => normalizeReg(r.region) === cleanTarget
-      ).length;
-      const comCount = typeFilteredReps.filter(
-        (r) => normalizeReg(r.region) === cleanTarget && isRepComercial(r)
-      ).length;
+      );
+      const totalReps = repsInRegion.length;
+      const comCount = repsInRegion.filter((r) => isRepComercial(r)).length;
       const medCount = totalReps - comCount;
-      const leadersCount = activeGds.filter((g) => {
-        const gdReg = normalizeReg(g.region);
-        if (gdReg === cleanTarget) return true;
-        if (g.region && g.region.toUpperCase().includes(conf.name.toUpperCase())) return true;
-        return false;
-      }).length;
+
+      // Exactamente 1 Gerente de Distrito asignado a la región
+      const canonicalGdName = REGION_GD_CANONICAL[code];
+      const regionGd = mapLeaders.find(
+        (g) => g.cargo.toUpperCase().includes('GERENTE') && matchLeaderName(canonicalGdName, g.nombre)
+      );
+
+      // Coordinadores comerciales que tienen representantes asignados en esta región (sin trade marketing)
+      const regionCoords = mapLeaders.filter((g) => {
+        if (!g.cargo.toUpperCase().includes('COORDINADOR')) return false;
+        if (isTradeMarketingLeader(g)) return false;
+        return repsInRegion.some((r) => matchLeaderName(r.gerenteDistrito, g.nombre));
+      });
+
+      // Total de líderes en la región: exactamente 1 GD + Coordinador(es) comercial(es) con representantes
+      const leadersCount = (regionGd ? 1 : 0) + regionCoords.length;
 
       return {
         ...conf,
@@ -1469,7 +1506,7 @@ export const CoverageMap: React.FC<CoverageMapProps> = ({
         leadersCount,
       };
     });
-  }, [enrichedStates, typeFilteredReps, activeGds]);
+  }, [enrichedStates, typeFilteredReps, mapLeaders]);
 
   // Filtered reps in active state inspector
   const filteredActiveReps = useMemo(() => {
