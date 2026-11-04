@@ -125,7 +125,8 @@ export const GD_EXCEL_COLUMNS: ExcelColumnDef[] = [
 
 export async function exportRepsToExcel(
   reps: Representante[],
-  filename: string = 'Agenda de Representantes.xlsx'
+  filename: string = 'Agenda de Representantes.xlsx',
+  selectedColumnKeys?: string[]
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Calox Farma';
@@ -138,8 +139,14 @@ export async function exportRepsToExcel(
   // Set default row height to exactly 14.5
   worksheet.properties.defaultRowHeight = 14.5;
 
+  // Filter columns if selectedColumnKeys is provided
+  const activeColumns =
+    selectedColumnKeys && selectedColumnKeys.length > 0
+      ? REP_EXCEL_COLUMNS.filter((col) => selectedColumnKeys.includes(col.key))
+      : REP_EXCEL_COLUMNS;
+
   // Define columns
-  worksheet.columns = REP_EXCEL_COLUMNS.map((col) => ({
+  worksheet.columns = activeColumns.map((col) => ({
     header: col.header,
     key: col.key,
     width: col.width,
@@ -176,7 +183,7 @@ export async function exportRepsToExcel(
 
   // Add data rows with standardized regions and row height 14.5
   reps.forEach((rep) => {
-    const row = worksheet.addRow({
+    const fullRowData: Record<string, any> = {
       codigo: rep.codigoSector || '',
       cedula: rep.cedula || '',
       representante: rep.nombre || '',
@@ -189,7 +196,14 @@ export async function exportRepsToExcel(
       gerenteDistrito: rep.gerenteDistrito || '',
       fechaIngreso: rep.fechaIngreso || '',
       estatus: rep.status || 'ACTIVO',
+    };
+
+    const rowData: Record<string, any> = {};
+    activeColumns.forEach((col) => {
+      rowData[col.key] = fullRowData[col.key] ?? '';
     });
+
+    const row = worksheet.addRow(rowData);
 
     row.height = 14.5;
 

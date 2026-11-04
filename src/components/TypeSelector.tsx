@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Representante, ViewMode, isRepComercial, isRepActive } from '../types/contact';
 import { RepresentantesList } from './RepresentantesList';
 import { LinkedSpreadsheetInfo } from '../services/sheetsService';
 import { MultiSelectDropdown, MultiSelectOption } from './MultiSelectDropdown';
+import { ExcelExportModal } from './ExcelExportModal';
 import { getMappedUnit } from '../App';
 import {
   Users,
@@ -115,6 +116,15 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
   coordinadorOptions,
   onClearFilters,
 }) => {
+  const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
+
+  const activeFilterCount =
+    selectedTypes.length +
+    selectedRegions.length +
+    selectedUnits.length +
+    selectedGerentes.length +
+    selectedCoordinadores.length;
+
   const hasActiveFilters =
     Boolean(searchTerm) ||
     selectedTypes.length > 0 ||
@@ -222,42 +232,85 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
             )}
           </div>
 
-          {/* Selector de modo tarjeta o tabla */}
-          {onViewModeChange && (
-            <div className="inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1] shrink-0 self-start sm:self-auto">
+          {/* Selector de modo tarjeta o tabla y Botones de Exportación a su derecha */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+            {onViewModeChange && (
+              <div className="inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange('grid')}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'grid'
+                      ? 'bg-theme-primary text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-theme-primary'
+                  }`}
+                  title="Vista Tarjetas"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+                  <span>Tarjetas</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onViewModeChange('table')}
+                  className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    viewMode === 'table'
+                      ? 'bg-theme-primary text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-theme-primary'
+                  }`}
+                  title="Vista Tabla"
+                >
+                  <Table2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Tabla</span>
+                </button>
+              </div>
+            )}
+
+            {/* Botón Excel (al lado derecho del modo de visualización con descripción "Excel") */}
+            <button
+              type="button"
+              onClick={() => setIsExcelExportModalOpen(true)}
+              className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 sm:px-3.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl sm:rounded-full transition-all cursor-pointer truncate shadow-2xs"
+              title="Descargar Agenda de Representantes en Excel (.xlsx)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Excel</span>
+              {activeFilterCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white ml-0.5">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            {/* Botón PDF (al lado derecho de Excel) */}
+            {onOpenPdfModal && (
               <button
                 type="button"
-                onClick={() => onViewModeChange('grid')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'grid'
-                    ? 'bg-theme-primary text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-theme-primary'
-                }`}
-                title="Vista Tarjetas"
+                onClick={onOpenPdfModal}
+                className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 sm:px-3.5 text-xs font-bold text-white bg-gradient-to-r from-[#FF4800] to-[#FF8F32] hover:opacity-90 rounded-xl sm:rounded-full transition-all cursor-pointer shadow-2xs truncate"
+                title="Exportar a PDF / Imprimir"
               >
-                <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
-                <span>Tarjetas</span>
+                <Printer className="w-3.5 h-3.5 shrink-0" />
+                <span>PDF</span>
               </button>
+            )}
+
+            {/* Botón Quitar Filtro en móvil si hay activos */}
+            {onClearFilters && hasActiveFilters && (
               <button
                 type="button"
-                onClick={() => onViewModeChange('table')}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'table'
-                    ? 'bg-theme-primary text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-theme-primary'
-                }`}
-                title="Vista Tabla"
+                onClick={onClearFilters}
+                className="sm:hidden p-1.5 rounded-xl bg-orange-50 text-orange-600 border border-orange-200 hover:bg-orange-100 transition-all cursor-pointer shadow-2xs shrink-0"
+                title="Quitar filtros aplicados"
               >
-                <Table2 className="w-3.5 h-3.5 shrink-0" />
-                <span>Tabla</span>
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Fila 3: Panel con los filtros y los botones de exportación en la parte inferior del panel con el buscador */}
+        {/* Fila 3 (ESCRITORIO / TABLET): Panel con los filtros individuales desplegables y botón de reset */}
         {showFilters && (
-          <div className="pt-2 sm:pt-4 border-t border-[#EAE5E1]/80 w-full grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-2">
+          <div className="hidden sm:flex sm:flex-wrap sm:items-center gap-2 pt-4 border-t border-[#EAE5E1]/80 w-full">
             {/* 1. Tipo de Representante */}
             {typeOptions && onTypesChange && (
               <MultiSelectDropdown
@@ -308,12 +361,12 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
               />
             )}
 
-            {/* 6. Botón Quitar Filtro (1° en el orden requerido) */}
+            {/* 6. Botón Quitar Filtro */}
             {onClearFilters && (
               <button
                 type="button"
                 onClick={onClearFilters}
-                className={`w-full sm:w-auto text-sm sm:text-xs rounded-xl sm:rounded-full px-3 sm:px-3.5 py-2 font-bold transition-all cursor-pointer flex items-center justify-center sm:inline-flex gap-1.5 select-none ${
+                className={`w-auto text-xs rounded-full px-3.5 py-2 font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 select-none ${
                   hasActiveFilters
                     ? 'bg-[#FF4800]/10 text-[#FF4800] border border-[#FF4800]/30 hover:bg-[#FF4800]/20 shadow-2xs'
                     : 'bg-[#F8F4F2] text-slate-600 hover:text-[#1A1A1E] border border-[#EAE5E1] hover:bg-slate-200/60'
@@ -324,35 +377,32 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
                 <span>Quitar Filtro</span>
               </button>
             )}
-
-            {/* 7. Botón Exportar Excel (2° en el orden requerido) */}
-            {onExportExcel && (
-              <button
-                type="button"
-                onClick={onExportExcel}
-                className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 rounded-xl sm:rounded-full transition-all cursor-pointer truncate shadow-2xs"
-                title="Descargar Agenda de Representantes (.xlsx)"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">Excel</span>
-              </button>
-            )}
-
-            {/* 8. Botón Exportar PDF (3° en el orden requerido) */}
-            {onOpenPdfModal && (
-              <button
-                type="button"
-                onClick={onOpenPdfModal}
-                className="flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-2 text-xs font-bold text-white bg-gradient-to-r from-[#FF4800] to-[#FF8F32] hover:opacity-90 rounded-xl sm:rounded-full transition-all cursor-pointer shadow-2xs truncate"
-                title="Exportar a PDF / Imprimir"
-              >
-                <Printer className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">PDF</span>
-              </button>
-            )}
           </div>
         )}
       </div>
+
+      {/* Modal de Exportación a Excel con Filtros y Selección de Campos */}
+      <ExcelExportModal
+        isOpen={isExcelExportModalOpen}
+        onClose={() => setIsExcelExportModalOpen(false)}
+        reps={reps || unifiedReps}
+        selectedTypes={selectedTypes}
+        onTypesChange={onTypesChange}
+        typeOptions={typeOptions}
+        selectedRegions={selectedRegions}
+        onRegionsChange={onRegionsChange}
+        regionOptions={regionOptions}
+        selectedUnits={selectedUnits}
+        onUnitsChange={onUnitsChange}
+        unitOptions={unitOptions}
+        selectedGerentes={selectedGerentes}
+        onGerentesChange={onGerentesChange}
+        gerenteOptions={gerenteOptions}
+        selectedCoordinadores={selectedCoordinadores}
+        onCoordinadoresChange={onCoordinadoresChange}
+        coordinadorOptions={coordinadorOptions}
+        onClearFilters={onClearFilters}
+      />
 
       {/* 2. Lista Única y Unificada de Representantes */}
       <RepresentantesList
