@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Representante } from '../types/contact';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Representante, isRepComercial } from '../types/contact';
 import { MultiSelectOption } from './MultiSelectDropdown';
-import { exportRepsToExcel, REP_EXCEL_COLUMNS } from '../utils/excelExport';
+import { exportRepsToExcel, REP_EXCEL_COLUMNS, getStandardRegion } from '../utils/excelExport';
+import { getMappedUnit, matchGerenteOrCoord } from '../App';
 import {
   X,
   FileSpreadsheet,
@@ -18,12 +19,15 @@ import {
   UserCheck,
   ChevronDown,
   ChevronUp,
+  Eye,
 } from 'lucide-react';
 
 interface ExcelExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   reps: Representante[];
+  allReps?: Representante[];
+  isExportOnly?: boolean;
   // Filters
   selectedTypes?: string[];
   onTypesChange?: (types: string[]) => void;
@@ -47,6 +51,8 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   isOpen,
   onClose,
   reps,
+  allReps,
+  isExportOnly = false,
   selectedTypes = [],
   onTypesChange,
   typeOptions = [],
@@ -67,6 +73,13 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const [activeTab, setActiveTab] = useState<'filtros' | 'campos'>('filtros');
   const [isExporting, setIsExporting] = useState(false);
 
+  // Local filter states for export-only mode (so parent directory is untouched)
+  const [localTypes, setLocalTypes] = useState<string[]>(selectedTypes);
+  const [localRegions, setLocalRegions] = useState<string[]>(selectedRegions);
+  const [localUnits, setLocalUnits] = useState<string[]>(selectedUnits);
+  const [localGerentes, setLocalGerentes] = useState<string[]>(selectedGerentes);
+  const [localCoordinadores, setLocalCoordinadores] = useState<string[]>(selectedCoordinadores);
+
   // Selected column keys for Excel (defaults to all 12 columns)
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<string[]>(
     REP_EXCEL_COLUMNS.map((c) => c.key)
@@ -74,6 +87,116 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
 
   // Accordion state for filter categories in mobile
   const [expandedSection, setExpandedSection] = useState<string | null>('tipos');
+
+  // Sync filters whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setLocalTypes(selectedTypes);
+      setLocalRegions(selectedRegions);
+      setLocalUnits(selectedUnits);
+      setLocalGerentes(selectedGerentes);
+      setLocalCoordinadores(selectedCoordinadores);
+    }
+  }, [isOpen]);
+
+  // Bloquear scroll de la interfaz de fondo en móviles y pantallas táctiles
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOpen]);
+
+  const effectiveTypes = isExportOnly ? localTypes : selectedTypes;
+  const effectiveRegions = isExportOnly ? localRegions : selectedRegions;
+  const effectiveUnits = isExportOnly ? localUnits : selectedUnits;
+  const effectiveGerentes = isExportOnly ? localGerentes : selectedGerentes;
+  const effectiveCoordinadores = isExportOnly ? localCoordinadores : selectedCoordinadores;
+
+  const setEffectiveTypes = (vals: string[]) => {
+    if (isExportOnly) setLocalTypes(vals);
+    else onTypesChange?.(vals);
+  };
+  const setEffectiveRegions = (vals: string[]) => {
+    if (isExportOnly) setLocalRegions(vals);
+    else onRegionsChange?.(vals);
+  };
+  const setEffectiveUnits = (vals: string[]) => {
+    if (isExportOnly) setLocalUnits(vals);
+    else onUnitsChange?.(vals);
+  };
+  const setEffectiveGerentes = (vals: string[]) => {
+    if (isExportOnly) setLocalGerentes(vals);
+    else onGerentesChange?.(vals);
+  };
+  const setEffectiveCoordinadores = (vals: string[]) => {
+    if (isExportOnly) setLocalCoordinadores(vals);
+    else onCoordinadoresChange?.(vals);
+  };
+
+  const handleClearModalFilters = () => {
+    if (isExportOnly) {
+      setLocalTypes([]);
+      setLocalRegions([]);
+      setLocalUnits([]);
+      setLocalGerentes([]);
+      setLocalCoordinadores([]);
+    } else {
+      onClearFilters?.();
+    }
+  };
+
+  // Base list of representatives: prefer allReps if provided to allow independent filtering
+  const baseReps = allReps || reps;
+
+  // Representatives filtered exclusively for Excel export
+  const filteredRepsForExport = useMemo(() => {
+    if (!isExportOnly) return reps;
+
+    return baseReps.filter((rep) => {
+      // 0. Tipo
+      if (effectiveTypes.length > 0) {
+        const isComercial = isRepComercial(rep);
+        const matchesComercial = effectiveTypes.includes('Comerciales') && isComercial;
+        const matchesVisita = effectiveTypes.includes('Visita Médica') && !isComercial;
+        if (!matchesComercial && !matchesVisita) return false;
+      }
+
+      // 1. Región
+      if (effectiveRegions.length > 0) {
+        const cleanReg = getStandardRegion(rep.region);
+        if (!effectiveRegions.includes(cleanReg)) return false;
+      }
+
+      // 2. Unidad de Negocio
+      if (effectiveUnits.length > 0) {
+        const mappedUnit = getMappedUnit(rep.unidadNegocio);
+        if (!effectiveUnits.includes(mappedUnit)) return false;
+      }
+
+      // 3. Gerente o Coordinador
+      if (effectiveGerentes.length > 0 && effectiveCoordinadores.length === 0) {
+        const matchesG = effectiveGerentes.some((g) => matchGerenteOrCoord(rep.gerenteDistrito, g));
+        if (!matchesG) return false;
+      } else if (effectiveCoordinadores.length > 0 && effectiveGerentes.length === 0) {
+        const matchesC = effectiveCoordinadores.some((c) => matchGerenteOrCoord(rep.gerenteDistrito, c));
+        if (!matchesC) return false;
+      } else if (effectiveGerentes.length > 0 && effectiveCoordinadores.length > 0) {
+        const matchesG = effectiveGerentes.some((g) => matchGerenteOrCoord(rep.gerenteDistrito, g));
+        const matchesC = effectiveCoordinadores.some((c) => matchGerenteOrCoord(rep.gerenteDistrito, c));
+        if (!matchesG && !matchesC) return false;
+      }
+
+      return true;
+    });
+  }, [baseReps, reps, isExportOnly, effectiveTypes, effectiveRegions, effectiveUnits, effectiveGerentes, effectiveCoordinadores]);
 
   if (!isOpen) return null;
 
@@ -87,11 +210,11 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const normCoords = normalizeOptions(coordinadorOptions);
 
   const activeFilterCount =
-    selectedTypes.length +
-    selectedRegions.length +
-    selectedUnits.length +
-    selectedGerentes.length +
-    selectedCoordinadores.length;
+    effectiveTypes.length +
+    effectiveRegions.length +
+    effectiveUnits.length +
+    effectiveGerentes.length +
+    effectiveCoordinadores.length;
 
   const toggleColumn = (key: string) => {
     setSelectedColumnKeys((prev) =>
@@ -146,7 +269,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
     try {
       setIsExporting(true);
       await exportRepsToExcel(
-        reps,
+        filteredRepsForExport,
         `Agenda_Representantes_Calox_${new Date().toISOString().slice(0, 10)}.xlsx`,
         selectedColumnKeys
       );
@@ -159,9 +282,21 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs overscroll-contain animate-in fade-in duration-200"
+      style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
+    >
       <div
-        className="w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] animate-in slide-in-from-bottom duration-300"
+        className="w-full sm:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[85vh] overscroll-contain animate-in slide-in-from-bottom duration-300"
+        style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
         role="dialog"
         aria-modal="true"
       >
@@ -173,10 +308,12 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
             </div>
             <div className="min-w-0">
               <h3 className="font-extrabold text-base sm:text-lg leading-tight truncate">
-                Exportar a Excel
+                {isExportOnly ? 'Exportar a Excel' : 'Filtros de Visualización/Excel'}
               </h3>
               <p className="text-[11px] sm:text-xs text-emerald-100 font-medium truncate">
-                Personaliza filtros y campos a exportar
+                {isExportOnly
+                  ? 'Filtra los datos y columnas para el archivo Excel'
+                  : 'Aplica filtros al directorio o personaliza la exportación a Excel'}
               </p>
             </div>
           </div>
@@ -202,7 +339,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
             }`}
           >
             <Filter className="w-3.5 h-3.5 text-emerald-600" />
-            <span>1. Filtros a Aplicar</span>
+            <span>{isExportOnly ? '1. Filtros para Excel' : '1. Filtros a Aplicar'}</span>
             {activeFilterCount > 0 && (
               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white">
                 {activeFilterCount}
@@ -220,7 +357,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
             }`}
           >
             <Columns className="w-3.5 h-3.5 text-emerald-600" />
-            <span>2. Campos (Columnas)</span>
+            <span>2. Columnas a Exportar</span>
             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700">
               {selectedColumnKeys.length}/{REP_EXCEL_COLUMNS.length}
             </span>
@@ -228,17 +365,20 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
         </div>
 
         {/* Tab Content (Scrollable Body) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div
+          className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4"
+          style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           {activeTab === 'filtros' ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs pb-1 border-b border-slate-100">
                 <span className="text-slate-500 font-semibold">
                   Filtra los datos que se incluirán en el archivo Excel:
                 </span>
-                {activeFilterCount > 0 && onClearFilters && (
+                {activeFilterCount > 0 && (
                   <button
                     type="button"
-                    onClick={onClearFilters}
+                    onClick={handleClearModalFilters}
                     className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -259,9 +399,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-emerald-600" />
                     <span>Tipo de Representante</span>
-                    {selectedTypes.length > 0 && (
+                    {effectiveTypes.length > 0 && (
                       <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                        {selectedTypes.length}
+                        {effectiveTypes.length}
                       </span>
                     )}
                   </div>
@@ -274,12 +414,12 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                 {expandedSection === 'tipos' && (
                   <div className="p-3 pt-0 border-t border-slate-100 flex flex-wrap gap-1.5">
                     {normTypes.map((opt) => {
-                      const isSelected = selectedTypes.includes(opt.value);
+                      const isSelected = effectiveTypes.includes(opt.value);
                       return (
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => toggleArrayItem(selectedTypes, opt.value, onTypesChange)}
+                          onClick={() => toggleArrayItem(effectiveTypes, opt.value, setEffectiveTypes)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-600 text-white shadow-2xs'
@@ -316,9 +456,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-emerald-600" />
                     <span>Regiones Geográficas</span>
-                    {selectedRegions.length > 0 && (
+                    {effectiveRegions.length > 0 && (
                       <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                        {selectedRegions.length}
+                        {effectiveRegions.length}
                       </span>
                     )}
                   </div>
@@ -331,12 +471,12 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                 {expandedSection === 'regiones' && (
                   <div className="p-3 pt-0 border-t border-slate-100 flex flex-wrap gap-1.5">
                     {normRegions.map((opt) => {
-                      const isSelected = selectedRegions.includes(opt.value);
+                      const isSelected = effectiveRegions.includes(opt.value);
                       return (
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => toggleArrayItem(selectedRegions, opt.value, onRegionsChange)}
+                          onClick={() => toggleArrayItem(effectiveRegions, opt.value, setEffectiveRegions)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-600 text-white shadow-2xs'
@@ -373,9 +513,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-emerald-600" />
                     <span>Unidades de Negocio</span>
-                    {selectedUnits.length > 0 && (
+                    {effectiveUnits.length > 0 && (
                       <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                        {selectedUnits.length}
+                        {effectiveUnits.length}
                       </span>
                     )}
                   </div>
@@ -388,12 +528,12 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                 {expandedSection === 'unidades' && (
                   <div className="p-3 pt-0 border-t border-slate-100 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
                     {normUnits.map((opt) => {
-                      const isSelected = selectedUnits.includes(opt.value);
+                      const isSelected = effectiveUnits.includes(opt.value);
                       return (
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => toggleArrayItem(selectedUnits, opt.value, onUnitsChange)}
+                          onClick={() => toggleArrayItem(effectiveUnits, opt.value, setEffectiveUnits)}
                           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
                               ? 'bg-emerald-600 text-white shadow-2xs'
@@ -430,9 +570,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-emerald-600" />
                     <span>Gerentes de Distrito</span>
-                    {selectedGerentes.length > 0 && (
+                    {effectiveGerentes.length > 0 && (
                       <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                        {selectedGerentes.length}
+                        {effectiveGerentes.length}
                       </span>
                     )}
                   </div>
@@ -445,13 +585,13 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                 {expandedSection === 'gerentes' && (
                   <div className="p-3 pt-0 border-t border-slate-100 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
                     {normGerentes.map((opt) => {
-                      const isSelected = selectedGerentes.includes(opt.value);
+                      const isSelected = effectiveGerentes.includes(opt.value);
                       return (
                         <button
                           key={opt.value}
                           type="button"
                           onClick={() =>
-                            toggleArrayItem(selectedGerentes, opt.value, onGerentesChange)
+                            toggleArrayItem(effectiveGerentes, opt.value, setEffectiveGerentes)
                           }
                           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
@@ -489,9 +629,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <UserCheck className="w-4 h-4 text-emerald-600" />
                     <span>Coordinadores</span>
-                    {selectedCoordinadores.length > 0 && (
+                    {effectiveCoordinadores.length > 0 && (
                       <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
-                        {selectedCoordinadores.length}
+                        {effectiveCoordinadores.length}
                       </span>
                     )}
                   </div>
@@ -504,13 +644,13 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                 {expandedSection === 'coords' && (
                   <div className="p-3 pt-0 border-t border-slate-100 flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
                     {normCoords.map((opt) => {
-                      const isSelected = selectedCoordinadores.includes(opt.value);
+                      const isSelected = effectiveCoordinadores.includes(opt.value);
                       return (
                         <button
                           key={opt.value}
                           type="button"
                           onClick={() =>
-                            toggleArrayItem(selectedCoordinadores, opt.value, onCoordinadoresChange)
+                            toggleArrayItem(effectiveCoordinadores, opt.value, setEffectiveCoordinadores)
                           }
                           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                             isSelected
@@ -619,7 +759,7 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
         <div className="p-3.5 sm:p-5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
           <div className="flex items-center justify-between sm:justify-start gap-2 text-xs">
             <span className="font-bold text-slate-800">
-              {reps.length} {reps.length === 1 ? 'representante' : 'representantes'}
+              {filteredRepsForExport.length} {filteredRepsForExport.length === 1 ? 'representante' : 'representantes'} a exportar
             </span>
             <span className="text-slate-400">·</span>
             <span className="text-slate-600 font-medium">
@@ -628,20 +768,34 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
+            {!isExportOnly && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-[#0850FD] hover:bg-[#0640D0] text-white font-extrabold text-xs shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                title="Aplicar y visualizar los filtros seleccionados en el directorio de representantes"
+              >
+                <Eye className="w-4 h-4 shrink-0" />
+                <span>Aplicar Filtros</span>
+              </button>
+            )}
+            {isExportOnly && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+            )}
             <button
               type="button"
               onClick={handleExport}
               disabled={isExporting || selectedColumnKeys.length === 0}
               className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 disabled:opacity-50 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              title="Descargar archivo Excel con los campos y filtros seleccionados"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4 shrink-0" />
               <span>{isExporting ? 'Generando...' : 'Descargar Excel'}</span>
             </button>
           </div>

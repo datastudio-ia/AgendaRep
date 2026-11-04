@@ -28,7 +28,7 @@ interface GerentesListProps {
   viewMode: ViewMode;
   teamCounts: Record<string, number>;
   onSelectGd: (gd: GerenteDistrito) => void;
-  onEditGd: (gd: GerenteDistrito) => void;
+  onEditGd?: (gd: GerenteDistrito) => void;
   onAddGd?: () => void;
   onViewTeam: (gdName: string) => void;
   onFilterByRegion: (regionName: string) => void;
@@ -332,29 +332,31 @@ export const GerentesList: React.FC<GerentesListProps> = ({
 
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onToggleStatus?.(gd);
-                            }}
-                            className={`w-7 h-7 rounded-full inline-flex items-center justify-center border transition-all cursor-pointer shadow-2xs shrink-0 ${
-                              (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
-                                : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700'
-                            }`}
-                            title={
-                              (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                                ? 'Líder activo (Clic para bloquear/desactivar)'
-                                : 'Líder inactivo (Clic para desbloquear/activar)'
-                            }
-                          >
-                            {(gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO' ? (
-                              <Unlock className="w-3.5 h-3.5" />
-                            ) : (
-                              <Lock className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                          {onToggleStatus && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleStatus(gd);
+                              }}
+                              className={`w-7 h-7 rounded-full inline-flex items-center justify-center border transition-all cursor-pointer shadow-2xs shrink-0 ${
+                                (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700'
+                              }`}
+                              title={
+                                (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                                  ? 'Líder activo (Clic para bloquear/desactivar)'
+                                  : 'Líder inactivo (Clic para desbloquear/activar)'
+                              }
+                            >
+                              {(gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO' ? (
+                                <Unlock className="w-3.5 h-3.5" />
+                              ) : (
+                                <Lock className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
 
                           {gd.telefono && (
                             <>
@@ -385,13 +387,15 @@ export const GerentesList: React.FC<GerentesListProps> = ({
                               <Mail className="w-3.5 h-3.5" />
                             </a>
                           )}
-                          <button
-                            onClick={() => onEditGd(gd)}
-                            className="p-1.5 text-slate-500 hover:text-theme-primary hover:bg-theme-10 rounded-full transition-colors cursor-pointer"
-                            title="Editar datos de este líder"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
+                          {onEditGd && (
+                            <button
+                              onClick={() => onEditGd(gd)}
+                              className="p-1.5 text-slate-500 hover:text-theme-primary hover:bg-theme-10 rounded-full transition-colors cursor-pointer"
+                              title="Editar datos de este líder"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {onDeleteGd && (
                             <button
                               onClick={() => setGdToDelete(gd)}
@@ -476,29 +480,31 @@ export const GerentesList: React.FC<GerentesListProps> = ({
                         </button>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleStatus?.(gd);
-                        }}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer border shadow-2xs ${
-                          (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/90 hover:bg-rose-50 hover:text-rose-700'
-                            : 'bg-rose-50 text-rose-700 border-rose-200/90 hover:bg-emerald-50 hover:text-emerald-700'
-                        }`}
-                        title={
-                          (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                            ? 'Líder activo (Clic para bloquear/desactivar)'
-                            : 'Líder inactivo (Clic para desbloquear/activar)'
-                        }
-                      >
-                        {(gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO' ? (
-                          <Unlock className="w-3.5 h-3.5" />
-                        ) : (
-                          <Lock className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                      {onToggleStatus && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleStatus(gd);
+                          }}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer border shadow-2xs ${
+                            (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200/90 hover:bg-rose-50 hover:text-rose-700'
+                              : 'bg-rose-50 text-rose-700 border-rose-200/90 hover:bg-emerald-50 hover:text-emerald-700'
+                          }`}
+                          title={
+                            (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                              ? 'Líder activo (Clic para bloquear/desactivar)'
+                              : 'Líder inactivo (Clic para desbloquear/activar)'
+                          }
+                        >
+                          {(gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO' ? (
+                            <Unlock className="w-3.5 h-3.5" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
 
                       {onDeleteGd && (
                         <button

@@ -205,3 +205,13 @@
 .border-xana-blue {
   border-color: var(--app-primary);
 }
+
+/* Scrollbar hiding utility */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

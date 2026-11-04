@@ -179,34 +179,36 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
 
                   <td className="py-2.5 px-3 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleStatus?.(rep);
-                        }}
-                        className={`w-7 h-7 rounded-full inline-flex items-center justify-center border transition-all cursor-pointer shadow-2xs shrink-0 ${
-                          (rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
-                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700'
-                        }`}
-                        title={
-                          (rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                            ? 'Representante activo (Clic para bloquear/desactivar)'
-                            : 'Representante inactivo (Clic para desbloquear/activar)'
-                        }
-                        aria-label={
-                          (rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
-                            ? 'Desactivar representante'
-                            : 'Activar representante'
-                        }
-                      >
-                        {(rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO' ? (
-                          <Unlock className="w-3.5 h-3.5" />
-                        ) : (
-                          <Lock className="w-3.5 h-3.5" />
-                        )}
-                      </button>
+                      {onToggleStatus && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleStatus(rep);
+                          }}
+                          className={`w-7 h-7 rounded-full inline-flex items-center justify-center border transition-all cursor-pointer shadow-2xs shrink-0 ${
+                            (rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700'
+                              : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-emerald-50 hover:text-emerald-700'
+                          }`}
+                          title={
+                            (rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                              ? 'Representante activo (Clic para bloquear/desactivar)'
+                              : 'Representante inactivo (Clic para desbloquear/activar)'
+                          }
+                          aria-label={
+                            (rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO'
+                              ? 'Desactivar representante'
+                              : 'Activar representante'
+                          }
+                        >
+                          {(rep.status || 'ACTIVO').toUpperCase() === 'ACTIVO' ? (
+                            <Unlock className="w-3.5 h-3.5" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
 
                       {rep.telefono && (
                         <>
@@ -338,34 +340,36 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleStatus?.(rep);
-                      }}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer border shadow-2xs ${
-                        isActive
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/90 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300'
-                          : 'bg-rose-50 text-rose-700 border-rose-200/90 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300'
-                      }`}
-                      title={
-                        isActive
-                          ? 'Representante activo (Clic para bloquear/desactivar)'
-                          : 'Representante inactivo (Clic para desbloquear/activar)'
-                      }
-                      aria-label={
-                        isActive
-                          ? 'Desactivar representante'
-                          : 'Activar representante'
-                      }
-                    >
-                      {isActive ? (
-                        <Unlock className="w-3.5 h-3.5" />
-                      ) : (
-                        <Lock className="w-3.5 h-3.5" />
-                      )}
-                    </button>
+                    {onToggleStatus && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleStatus(rep);
+                        }}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer border shadow-2xs ${
+                          isActive
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/90 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300'
+                            : 'bg-rose-50 text-rose-700 border-rose-200/90 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300'
+                        }`}
+                        title={
+                          isActive
+                            ? 'Representante activo (Clic para bloquear/desactivar)'
+                            : 'Representante inactivo (Clic para desbloquear/activar)'
+                        }
+                        aria-label={
+                          isActive
+                            ? 'Desactivar representante'
+                            : 'Activar representante'
+                        }
+                      >
+                        {isActive ? (
+                          <Unlock className="w-3.5 h-3.5" />
+                        ) : (
+                          <Lock className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
 
                     {onDeleteRep && (
                       <button

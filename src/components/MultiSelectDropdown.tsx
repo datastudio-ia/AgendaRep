@@ -113,7 +113,10 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
 
       {/* Popover menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 sm:right-auto mt-1.5 w-full sm:w-64 max-w-full sm:max-w-none bg-white rounded-2xl border border-[#EAE5E1] shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="absolute left-0 right-0 sm:right-auto mt-1.5 w-full sm:w-64 max-w-full sm:max-w-none bg-white rounded-2xl border border-[#EAE5E1] shadow-xl z-50 py-2 animate-in fade-in zoom-in-95 duration-150 overscroll-contain"
+          style={{ overscrollBehavior: 'contain' }}
+        >
           {/* Header controls: select all / clear */}
           <div className="flex items-center justify-between px-3 pb-2 mb-1 border-b border-[#EAE5E1] text-xs">
             <span className="font-extrabold text-slate-400 uppercase tracking-wider truncate">
@@ -139,7 +142,10 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           </div>
 
           {/* Options list */}
-          <div className="max-h-56 overflow-y-auto px-1.5 space-y-0.5">
+          <div
+            className="max-h-56 overflow-y-auto overscroll-contain px-1.5 space-y-0.5"
+            style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+          >
             {normalizedOptions.map((opt) => {
               const isSelected = selectedValues.includes(opt.value);
               return (

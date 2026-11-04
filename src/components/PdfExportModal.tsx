@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Representante, GerenteDistrito } from '../types/contact';
 import { getMappedUnit } from '../App';
 import {
@@ -39,6 +39,21 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
     }
     return reps;
   }, [reps, scope]);
+
+  // Bloquear scroll de la interfaz de fondo al abrir el modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -297,8 +312,20 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 border border-[#EAE5E1] shadow-2xl relative space-y-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs overscroll-contain animate-in fade-in"
+      style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) e.preventDefault();
+      }}
+    >
+      <div
+        className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 border border-[#EAE5E1] shadow-2xl relative space-y-6 overscroll-contain"
+        style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+      >
         <button
           onClick={onClose}
           className="absolute right-5 top-5 p-2 rounded-full text-slate-400 hover:text-[#1A1A1E] hover:bg-slate-100 transition-colors"

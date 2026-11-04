@@ -117,6 +117,7 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
   onClearFilters,
 }) => {
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
+  const [modalIsExportOnly, setModalIsExportOnly] = useState(false);
 
   const activeFilterCount =
     selectedTypes.length +
@@ -179,8 +180,8 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
     <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full overflow-x-hidden">
       {/* 1. Header del Directorio Unificado */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 sm:gap-5 w-full max-w-full">
-        {/* Fila superior: Título y Botón Agregar Representante */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 w-full">
+        {/* Fila superior: Título del Directorio y Botón Agregar (en PC superior derecha) */}
+        <div className="flex items-center justify-between gap-2.5 sm:gap-4 w-full">
           <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl theme-gradient-bg text-white flex items-center justify-center shadow-2xs shrink-0">
               <Users className="w-4 h-4 sm:w-6 sm:h-6" />
@@ -195,11 +196,11 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
             </div>
           </div>
 
-          {/* Botón de acción: Agregar Representante */}
+          {/* Botón Agregar Representante (en PC, ubicado en la parte superior derecha del recuadro) */}
           {onAddRep && (
             <button
               onClick={onAddRep}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0"
+              className="hidden sm:inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0 whitespace-nowrap"
               title="Agregar nuevo representante"
             >
               <UserPlus className="w-4 h-4 shrink-0" />
@@ -208,32 +209,10 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
           )}
         </div>
 
-        {/* Fila 2: Panel con el buscador y Selector de modo tarjeta o tabla */}
+        {/* Fila 2: Controles (Móvil: Modo, Agregar, Buscador | PC: Buscador a la izquierda, Modo a la derecha) */}
         <div className="pt-2 sm:pt-4 border-t border-[#EAE5E1]/80 w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
-          {/* Panel de búsqueda */}
-          <div className="relative flex-1 w-full max-w-full">
-            <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-primary" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder="Buscar nombre, cédula, ciudad, teléfono..."
-              className="w-full max-w-full pl-9 sm:pl-10 pr-8 sm:pr-9 py-2 sm:py-2.5 text-sm bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl sm:rounded-full focus:bg-white focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent transition-all placeholder:text-slate-400 font-medium text-[#1A1A1E]"
-            />
-            {searchTerm && onSearchChange && (
-              <button
-                type="button"
-                onClick={() => onSearchChange('')}
-                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
-                title="Limpiar búsqueda"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Selector de modo tarjeta o tabla y Botones de Exportación a su derecha */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+          {/* En Móvil: 1er Lugar (Modo y Filtros/Exportar) | En PC: 2do Lugar (Modo Tarjetas / Tabla a la derecha) */}
+          <div className="order-1 sm:order-2 flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap w-full sm:w-auto justify-between sm:justify-start py-0.5">
             {onViewModeChange && (
               <div className="inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1] shrink-0">
                 <button
@@ -265,34 +244,24 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
               </div>
             )}
 
-            {/* Botón Excel (al lado derecho del modo de visualización con descripción "Excel") */}
+            {/* Botón Filtros/Exportar (en Móvil se mantiene aquí; en PC está en la fila de filtros) */}
             <button
               type="button"
-              onClick={() => setIsExcelExportModalOpen(true)}
-              className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 sm:px-3.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl sm:rounded-full transition-all cursor-pointer truncate shadow-2xs"
-              title="Descargar Agenda de Representantes en Excel (.xlsx)"
+              onClick={() => {
+                setModalIsExportOnly(false);
+                setIsExcelExportModalOpen(true);
+              }}
+              className="sm:hidden flex items-center justify-center gap-1.5 py-1.5 px-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all cursor-pointer shadow-2xs shrink-0"
+              title="Filtros/Exportar"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Excel</span>
+              <span className="whitespace-nowrap">Filtros/Exportar</span>
               {activeFilterCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white ml-0.5">
                   {activeFilterCount}
                 </span>
               )}
             </button>
-
-            {/* Botón PDF (al lado derecho de Excel) */}
-            {onOpenPdfModal && (
-              <button
-                type="button"
-                onClick={onOpenPdfModal}
-                className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 sm:px-3.5 text-xs font-bold text-white bg-gradient-to-r from-[#FF4800] to-[#FF8F32] hover:opacity-90 rounded-xl sm:rounded-full transition-all cursor-pointer shadow-2xs truncate"
-                title="Exportar a PDF / Imprimir"
-              >
-                <Printer className="w-3.5 h-3.5 shrink-0" />
-                <span>PDF</span>
-              </button>
-            )}
 
             {/* Botón Quitar Filtro en móvil si hay activos */}
             {onClearFilters && hasActiveFilters && (
@@ -306,9 +275,43 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
               </button>
             )}
           </div>
+
+          {/* En Móvil: 2do Lugar (Botón Agregar Representante) */}
+          {onAddRep && (
+            <button
+              onClick={onAddRep}
+              className="order-2 sm:hidden w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-theme-primary hover:bg-theme-primary-hover text-white text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer shrink-0 whitespace-nowrap"
+              title="Agregar nuevo representante"
+            >
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span>Agregar Representante</span>
+            </button>
+          )}
+
+          {/* En Móvil: 3er Lugar | En PC: 1er Lugar (Barra de búsqueda expandida a la izquierda) */}
+          <div className="order-3 sm:order-1 relative flex-1 w-full max-w-full">
+            <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-primary" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+              placeholder="Buscar nombre, cédula, ciudad, teléfono..."
+              className="w-full max-w-full pl-9 sm:pl-10 pr-8 sm:pr-9 py-2 sm:py-2.5 text-sm bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl sm:rounded-full focus:bg-white focus:outline-none focus:ring-2 focus:ring-theme-primary focus:border-transparent transition-all placeholder:text-slate-400 font-medium text-[#1A1A1E]"
+            />
+            {searchTerm && onSearchChange && (
+              <button
+                type="button"
+                onClick={() => onSearchChange('')}
+                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Fila 3 (ESCRITORIO / TABLET): Panel con los filtros individuales desplegables y botón de reset */}
+        {/* Fila 3 (ESCRITORIO / PC): Panel con los filtros individuales desplegables, botón Filtros/Exportar y reset */}
         {showFilters && (
           <div className="hidden sm:flex sm:flex-wrap sm:items-center gap-2 pt-4 border-t border-[#EAE5E1]/80 w-full">
             {/* 1. Tipo de Representante */}
@@ -377,6 +380,20 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
                 <span>Quitar Filtro</span>
               </button>
             )}
+
+            {/* 7. Botón Filtros/Exportar (en PC al derecho del botón Quitar Filtro, es decir al final) */}
+            <button
+              type="button"
+              onClick={() => {
+                setModalIsExportOnly(true);
+                setIsExcelExportModalOpen(true);
+              }}
+              className="w-auto text-xs rounded-full px-3.5 py-2 font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 select-none bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 shadow-2xs shrink-0"
+              title="Filtros de Exportación a Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="whitespace-nowrap">Filtros/Exportar</span>
+            </button>
           </div>
         )}
       </div>
@@ -386,6 +403,8 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
         isOpen={isExcelExportModalOpen}
         onClose={() => setIsExcelExportModalOpen(false)}
         reps={reps || unifiedReps}
+        allReps={unifiedReps}
+        isExportOnly={modalIsExportOnly}
         selectedTypes={selectedTypes}
         onTypesChange={onTypesChange}
         typeOptions={typeOptions}

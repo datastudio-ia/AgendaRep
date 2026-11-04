@@ -24,6 +24,7 @@ import { ContactModal } from './components/ContactModal';
 import { RepFormModal } from './components/RepFormModal';
 import { GdFormModal } from './components/GdFormModal';
 import { ThemeSelectorModal } from './components/ThemeSelectorModal';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { ThemeId, APP_THEMES } from './types/theme';
 import {
   AuthUser,
@@ -236,16 +237,28 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', currentTheme);
   }, [currentTheme]);
 
+  // User Role state: Invitado (false, primary default read-only) vs Administrador (true, secondary full access)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
+
   // Representative Form Modal state (Create & Edit)
   const [isRepFormOpen, setIsRepFormOpen] = useState(false);
   const [repToEdit, setRepToEdit] = useState<Representante | null>(null);
 
   const handleOpenCreateRep = () => {
+    if (!isAdmin) {
+      setIsAdminModalOpen(true);
+      return;
+    }
     setRepToEdit(null);
     setIsRepFormOpen(true);
   };
 
   const handleOpenEditRep = (rep: Representante) => {
+    if (!isAdmin) {
+      setIsAdminModalOpen(true);
+      return;
+    }
     setRepToEdit(rep);
     setIsRepFormOpen(true);
   };
@@ -255,11 +268,19 @@ export default function App() {
   const [gdToEdit, setGdToEdit] = useState<GerenteDistrito | null>(null);
 
   const handleOpenCreateGd = () => {
+    if (!isAdmin) {
+      setIsAdminModalOpen(true);
+      return;
+    }
     setGdToEdit(null);
     setIsGdFormOpen(true);
   };
 
   const handleOpenEditGd = (gd: GerenteDistrito) => {
+    if (!isAdmin) {
+      setIsAdminModalOpen(true);
+      return;
+    }
     setGdToEdit(gd);
     setIsGdFormOpen(true);
   };
@@ -1000,7 +1021,7 @@ export default function App() {
       className="min-h-screen w-full max-w-full overflow-x-hidden flex flex-col transition-colors duration-200"
       style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
     >
-      {/* 1. Header with Branding & Theme Switching */}
+      {/* 1. Header with Branding, Role Switching & Theme Switching */}
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -1010,9 +1031,19 @@ export default function App() {
         isLoggingIn={isLoggingIn}
         currentTheme={currentTheme}
         onOpenThemeModal={() => setIsThemeModalOpen(true)}
-        onAddRep={handleOpenCreateRep}
-        onAddGd={handleOpenCreateGd}
+        onAddRep={isAdmin ? handleOpenCreateRep : undefined}
+        onAddGd={isAdmin ? handleOpenCreateGd : undefined}
         totalRepsCount={activeRepsData.length}
+        isAdmin={isAdmin}
+        onOpenAdminModal={() => setIsAdminModalOpen(true)}
+        onLogoutAdmin={() => {
+          setIsAdmin(false);
+          if (activeTab === 'sheets') setActiveTab('reps');
+          setSyncToast({
+            type: 'info',
+            message: 'Sesión cambiada a modo Invitado (Solo lectura).',
+          });
+        }}
       />
 
       {/* 2. Quantitative Metric Strip */}
@@ -1047,10 +1078,10 @@ export default function App() {
               onSelectRep={handleSelectRep}
               onFilterByManager={handleFilterByManager}
               onFilterByRegion={handleFilterByRegion}
-              onAddRep={handleOpenCreateRep}
-              onEditRep={handleOpenEditRep}
-              onDeleteRep={handleDeleteRep}
-              onToggleStatus={handleToggleRepStatus}
+              onAddRep={isAdmin ? handleOpenCreateRep : undefined}
+              onEditRep={isAdmin ? handleOpenEditRep : undefined}
+              onDeleteRep={isAdmin ? handleDeleteRep : undefined}
+              onToggleStatus={isAdmin ? handleToggleRepStatus : undefined}
               countLaSante={totalLaSante}
               countPharmetique={totalPharmetique}
               countOtc={totalOtc}
@@ -1104,15 +1135,17 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Botón de acción: Nuevo GD / Coordinador */}
-                <button
-                  onClick={handleOpenCreateGd}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0"
-                  title="Agregar nuevo GD o Coordinador"
-                >
-                  <Plus className="w-4 h-4 shrink-0" />
-                  <span>Nuevo GD / Coordinador</span>
-                </button>
+                {/* Botón de acción: Nuevo GD / Coordinador (Solo Administrador) */}
+                {isAdmin && (
+                  <button
+                    onClick={handleOpenCreateGd}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0"
+                    title="Agregar nuevo GD o Coordinador"
+                  >
+                    <Plus className="w-4 h-4 shrink-0" />
+                    <span>Nuevo GD / Coordinador</span>
+                  </button>
+                )}
               </div>
 
               {/* Fila inferior: Buscador, Selector de Modo y Botón Exportar a Excel */}
@@ -1188,12 +1221,12 @@ export default function App() {
               viewMode={viewMode}
               teamCounts={teamCounts}
               onSelectGd={handleSelectGd}
-              onEditGd={handleOpenEditGd}
-              onAddGd={handleOpenCreateGd}
+              onEditGd={isAdmin ? handleOpenEditGd : undefined}
+              onAddGd={isAdmin ? handleOpenCreateGd : undefined}
               onViewTeam={handleViewTeam}
               onFilterByRegion={handleFilterByRegion}
-              onToggleStatus={handleToggleGdStatus}
-              onDeleteGd={handleDeleteGd}
+              onToggleStatus={isAdmin ? handleToggleGdStatus : undefined}
+              onDeleteGd={isAdmin ? handleDeleteGd : undefined}
             />
           </div>
         )}
@@ -1262,10 +1295,10 @@ export default function App() {
         isRep={isRepModal}
         onClose={() => setSelectedContact(null)}
         onSelectManager={handleSelectManagerFromModal}
-        onEditRep={handleOpenEditRep}
-        onEditGd={handleOpenEditGd}
-        onDeleteRep={handleDeleteRep}
-        onDeleteGd={handleDeleteGd}
+        onEditRep={isAdmin ? handleOpenEditRep : undefined}
+        onEditGd={isAdmin ? handleOpenEditGd : undefined}
+        onDeleteRep={isAdmin ? handleDeleteRep : undefined}
+        onDeleteGd={isAdmin ? handleDeleteGd : undefined}
       />
 
       {/* 7. PDF Export & Printable Guide Modal (Feature 6) */}
@@ -1344,6 +1377,28 @@ export default function App() {
           } catch (e) {
             console.error('Failed to save theme in localStorage:', e);
           }
+        }}
+      />
+
+      {/* 10. User Role / Admin Access Modal */}
+      <AdminLoginModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        isAdmin={isAdmin}
+        onLoginSuccess={() => {
+          setIsAdmin(true);
+          setSyncToast({
+            type: 'success',
+            message: 'Acceso concedido como Administrador (Administrador26). Edición habilitada.',
+          });
+        }}
+        onLogoutAdmin={() => {
+          setIsAdmin(false);
+          if (activeTab === 'sheets') setActiveTab('reps');
+          setSyncToast({
+            type: 'info',
+            message: 'Sesión cambiada a modo Invitado (Solo lectura).',
+          });
         }}
       />
     </div>
