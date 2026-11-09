@@ -175,28 +175,178 @@ export const extractSpreadsheetId = (input: string): string => {
 };
 
 /**
- * Fetch spreadsheet metadata to locate sheet tabs.
+ * Universal CSV parser supporting comma and semicolon delimiters, quoted values,
+ * and escaped quotes.
+ */
+export function parseCsvText(csvText: string): { headers: string[]; rows: string[][] } {
+  const lines = csvText.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return { headers: [], rows: [] };
+
+  const firstLine = lines[0];
+  const semicolonCount = (firstLine.match(/;/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const delimiter = semicolonCount > commaCount ? ';' : ',';
+
+  const parseLine = (line: string): string[] => {
+    const fields: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delimiter && !inQuotes) {
+        fields.push(current.trim().replace(/^"|"$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    fields.push(current.trim().replace(/^"|"$/g, ''));
+    return fields;
+  };
+
+  const headers = parseLine(lines[0]);
+  const rows = lines.slice(1).map(parseLine);
+  return { headers, rows };
+}
+
+/**
+ * Reads any public or shared Google Sheets document directly via the Google
+ * Visualization API CSV export endpoint without requiring OAuth sign-in.
+ */
+export async function fetchSpreadsheetPublicCsv(
+  spreadsheetId: string,
+  tabName?: string
+): Promise<{ headers: string[]; rows: string[][] }> {
+  const cleanId = extractSpreadsheetId(spreadsheetId) || spreadsheetId;
+  const sheetParam = tabName ? `&sheet=${encodeURIComponent(tabName)}` : '';
+  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(
+      `No se pudo leer la hoja (${res.status}). Verifica que la hoja esté compartida como "Cualquiera con el enlace puede ver".`
+    );
+  }
+  const text = await res.text();
+  return parseCsvText(text);
+}
+
+/**
+ * Fetch spreadsheet metadata to locate sheet tabs. Supports both authenticated
+ * Google API and public Google Sheets documents without requiring OAuth login.
  */
 export async function getSpreadsheetDetails(
   spreadsheetId: string
 ): Promise<{ title: string; sheets: string[] }> {
+  const cleanId = extractSpreadsheetId(spreadsheetId) || spreadsheetId;
   const token = await getAccessToken();
-  if (!token) throw new Error('Debes iniciar sesión con Google para acceder a las hojas.');
 
-  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  // Try Google Sheets API v4 if token is present
+  if (token && token !== 'local-token') {
+    try {
+      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cleanId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Error al leer la hoja de cálculo (${res.status}): ${err}`);
+      if (res.ok) {
+        const data = await res.json();
+        const sheets = (data.sheets || []).map((s: any) => s.properties?.title as string);
+        return {
+          title: data.properties?.title || 'Hoja de Google Sheets',
+          sheets,
+        };
+      }
+    } catch (e) {
+      console.warn('API v4 fetch failed, trying public GViz probe:', e);
+    }
   }
 
-  const data = await res.json();
-  const sheets = (data.sheets || []).map((s: any) => s.properties?.title as string);
+  // Fallback: Probe public Google Sheets GViz CSV export
+  try {
+    const csvData = await fetchSpreadsheetPublicCsv(cleanId);
+    if (csvData.headers.length > 0) {
+      return {
+        title: 'Hoja de Google Sheets Vinculada',
+        sheets: ['Representantes', 'Gerentes de Distrito', 'Credenciales'],
+      };
+    }
+  } catch (publicErr: any) {
+    if (!token || token === 'local-token') {
+      throw new Error(
+        'Para acceder a esta hoja: o bien compártela en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.'
+      );
+    }
+    throw publicErr;
+  }
+
   return {
-    title: data.properties?.title || 'Hoja de Google Sheets',
-    sheets,
+    title: 'Hoja de Google Sheets Vinculada',
+    sheets: ['Representantes'],
+  };
+}
+
+/**
+ * Generic fetcher for any Google Sheet tab, returning headers and structured object rows.
+ */
+export async function fetchGenericSpreadsheet(
+  spreadsheetId: string,
+  tabName?: string
+): Promise<{ headers: string[]; rows: Record<string, string>[]; rawRows: string[][] }> {
+  const cleanId = extractSpreadsheetId(spreadsheetId) || spreadsheetId;
+  const token = await getAccessToken();
+
+  let rows: string[][] = [];
+  let headers: string[] = [];
+
+  if (token && token !== 'local-token') {
+    try {
+      const targetTab = tabName || 'Hoja 1';
+      const range = `${encodeURIComponent(targetTab)}!A1:ZZ`;
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/${range}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const apiRows: string[][] = data.values || [];
+        if (apiRows.length > 0) {
+          headers = apiRows[0];
+          rows = apiRows.slice(1);
+        }
+      }
+    } catch (err) {
+      console.warn('API v4 generic fetch failed, falling back to public csv:', err);
+    }
+  }
+
+  if (headers.length === 0) {
+    const publicData = await fetchSpreadsheetPublicCsv(cleanId, tabName);
+    headers = publicData.headers;
+    rows = publicData.rows;
+  }
+
+  const structuredRows: Record<string, string>[] = rows.map((row) => {
+    const item: Record<string, string> = {};
+    headers.forEach((h, idx) => {
+      item[h || `Columna ${idx + 1}`] = row[idx] !== undefined ? String(row[idx]).trim() : '';
+    });
+    return item;
+  });
+
+  return {
+    headers,
+    rows: structuredRows,
+    rawRows: rows,
   };
 }
 
@@ -391,29 +541,50 @@ export async function pullRepsFromSpreadsheet(
   tabName?: string
 ): Promise<PullSyncResult> {
   const token = await getAccessToken();
-  if (!token) throw new Error('Debes iniciar sesión con Google para sincronizar.');
 
+  let rows: string[][] = [];
   let targetTab = tabName;
-  if (!targetTab) {
-    const details = await getSpreadsheetDetails(spreadsheetId);
-    targetTab = details.sheets.find(s => s.toLowerCase().includes('representante')) || details.sheets[0] || 'Representantes';
-  }
 
-  const range = `${encodeURIComponent(targetTab)}!A1:Z`;
-  const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
+  if (token && token !== 'local-token') {
+    try {
+      if (!targetTab) {
+        const details = await getSpreadsheetDetails(spreadsheetId);
+        targetTab = details.sheets.find(s => s.toLowerCase().includes('representante')) || details.sheets[0] || 'Representantes';
+      }
+
+      const range = `${encodeURIComponent(targetTab)}!A1:Z`;
+      const res = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        rows = data.values || [];
+      }
+    } catch (apiErr) {
+      console.warn('API v4 pull failed, falling back to public CSV pull:', apiErr);
     }
-  );
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Error al leer hoja '${targetTab}' (${res.status}): ${errText}`);
   }
 
-  const data = await res.json();
-  const rows: string[][] = data.values || [];
+  // Fallback to public CSV export
+  if (rows.length === 0) {
+    try {
+      const publicData = await fetchSpreadsheetPublicCsv(spreadsheetId, targetTab);
+      if (publicData.headers.length > 0) {
+        rows = [publicData.headers, ...publicData.rows];
+      }
+    } catch (publicErr) {
+      if (!token || token === 'local-token') {
+        throw new Error(
+          'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.'
+        );
+      }
+      throw publicErr;
+    }
+  }
 
   if (rows.length < 2) {
     return {

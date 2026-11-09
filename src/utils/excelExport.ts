@@ -343,3 +343,138 @@ export async function exportGdsToExcel(
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+export async function exportCredencialesToExcel(
+  credenciales: import('../types/contact').CredencialDrogueria[],
+  filename: string = 'Credenciales_Droguerias.xlsx'
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Credenciales Droguerías');
+
+  worksheet.columns = [
+    { header: 'Droguería', key: 'drogueria', width: 18 },
+    { header: 'Representante', key: 'representante', width: 28 },
+    { header: 'Cédula', key: 'cedula', width: 14 },
+    { header: 'Correo Electrónico', key: 'correo', width: 34 },
+    { header: 'Cargo', key: 'cargo', width: 26 },
+    { header: 'Región', key: 'region', width: 22 },
+    { header: 'Usuario', key: 'usuario', width: 22 },
+    { header: 'Contraseña', key: 'password', width: 22 },
+    { header: 'Portal / Link', key: 'portalUrl', width: 38 },
+    { header: 'Estatus', key: 'estatus', width: 14 },
+  ];
+
+  const headerRow = worksheet.getRow(1);
+  headerRow.height = 24;
+  headerRow.eachCell((cell) => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF0850FD' },
+    };
+    cell.font = {
+      name: 'Calibri',
+      size: 11,
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+
+  credenciales.forEach((c) => {
+    const row = worksheet.addRow({
+      drogueria: c.drogueria,
+      representante: c.representante,
+      cedula: c.cedula,
+      correo: c.correo,
+      cargo: c.cargo,
+      region: c.region,
+      usuario: c.usuario,
+      password: c.password || '',
+      portalUrl: c.portalUrl,
+      estatus: c.estatus,
+    });
+    row.height = 18;
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { name: 'Calibri', size: 10 };
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+      };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export async function exportGenericDatabaseToExcel(
+  headers: string[],
+  rows: Record<string, string>[],
+  sheetTitle: string = 'Datos',
+  filename: string = 'export.xlsx'
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(sheetTitle.substring(0, 31));
+
+  worksheet.columns = headers.map((h) => ({
+    header: h,
+    key: h,
+    width: Math.max(14, Math.min(35, h.length + 6)),
+  }));
+
+  const headerRow = worksheet.getRow(1);
+  headerRow.height = 24;
+  headerRow.eachCell((cell) => {
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF107C41' },
+    };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+
+  rows.forEach((r) => {
+    const row = worksheet.addRow(r);
+    row.height = 18;
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { name: 'Calibri', size: 10 };
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        left: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        bottom: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+        right: { style: 'thin', color: { argb: 'FFD9D9D9' } },
+      };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+

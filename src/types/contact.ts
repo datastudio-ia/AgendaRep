@@ -59,7 +59,44 @@ export interface GerenteDistrito {
   estado?: string;
 }
 
+export interface CredencialDrogueria {
+  id: string;
+  drogueria: string;
+  representante: string;
+  cedula: string;
+  correo: string;
+  cargo: string;
+  region: string;
+  usuario: string;
+  password?: string;
+  portalUrl: string;
+  estatus: string;
+}
+
+export interface CustomDatabase {
+  id: string;
+  name: string;
+  description?: string;
+  sourceType: 'google_sheets' | 'csv' | 'local';
+  sourceUrl?: string;
+  spreadsheetId?: string;
+  sheetTabName?: string;
+  headers: string[];
+  rows: Record<string, string>[];
+  totalRows: number;
+  createdAt: string;
+  lastSyncedAt?: string;
+}
+
 export type ViewMode = 'grid' | 'table';
-export type ActiveTab = 'reps' | 'gds' | 'map' | 'analytics' | 'matrix' | 'sheets';
+export type ActiveTab =
+  | 'reps'
+  | 'gds'
+  | 'map'
+  | 'analytics'
+  | 'matrix'
+  | 'credenciales'
+  | 'sheets'
+  | string;
 export type RepCategory = 'all' | 'comercial' | 'visita_medica' | 'split';
 

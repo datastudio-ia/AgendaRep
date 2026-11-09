@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AuthUser } from '../services/firebaseAuth';
-import { ActiveTab } from '../types/contact';
+import { ActiveTab, CustomDatabase } from '../types/contact';
 import { ThemeId, APP_THEMES } from '../types/theme';
-import { LogOut, FileSpreadsheet, Users, UserCheck, Network, Compass, BarChart3, Palette, Settings, ShieldCheck, Lock, Eye } from 'lucide-react';
+import { LogOut, FileSpreadsheet, Users, UserCheck, Network, Compass, BarChart3, Palette, Settings, ShieldCheck, Lock, Eye, KeyRound, Database } from 'lucide-react';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
@@ -17,6 +17,8 @@ interface HeaderProps {
   onAddRep?: () => void;
   onAddGd?: () => void;
   totalRepsCount?: number;
+  totalCredencialesCount?: number;
+  customDatabases?: CustomDatabase[];
   isAdmin?: boolean;
   onOpenAdminModal?: () => void;
   onLogoutAdmin?: () => void;
@@ -34,6 +36,8 @@ export const Header: React.FC<HeaderProps> = ({
   onAddRep,
   onAddGd,
   totalRepsCount = 83,
+  totalCredencialesCount = 183,
+  customDatabases = [],
   isAdmin = false,
   onOpenAdminModal,
   onLogoutAdmin,
@@ -126,6 +130,31 @@ export const Header: React.FC<HeaderProps> = ({
               <Network className="w-3.5 h-3.5" />
               <span>Organigrama</span>
             </button>
+            <button
+              onClick={() => onTabChange('credenciales')}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'credenciales'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-white/90 hover:text-white hover:bg-white/15'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Credenciales Drog</span>
+            </button>
+            {customDatabases.map((db) => (
+              <button
+                key={db.id}
+                onClick={() => onTabChange(db.id)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === db.id
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
+                    : 'text-white/90 hover:text-white hover:bg-white/15'
+                }`}
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>{db.name}</span>
+              </button>
+            ))}
           </nav>
 
           {/* Zone 3: Perfil de Usuario (Invitado / Administrador) y Configuración */}
@@ -226,33 +255,31 @@ export const Header: React.FC<HeaderProps> = ({
                       </button>
                     )}
 
-                    {/* Function 1: Google Sheets (solo visible/editable para Administrador) */}
-                    {isAdmin && (
-                      <button
-                        onClick={() => {
-                          onTabChange('sheets');
-                          setIsConfigOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                          activeTab === 'sheets'
-                            ? 'bg-blue-50 text-blue-700 font-bold'
-                            : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className={`p-1.5 rounded-lg ${activeTab === 'sheets' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-50 text-emerald-600'}`}>
-                            <FileSpreadsheet className="w-4 h-4" />
-                          </div>
-                          <div className="text-left">
-                            <div className="text-xs font-bold">Google Sheets</div>
-                            <div className="text-[10px] text-slate-500 font-normal">Sincronización de datos</div>
-                          </div>
+                    {/* Function 1: Google Sheets (accesible para visualizar la base de datos principal) */}
+                    <button
+                      onClick={() => {
+                        onTabChange('sheets');
+                        setIsConfigOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        activeTab === 'sheets'
+                          ? 'bg-blue-50 text-blue-700 font-bold'
+                          : 'text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${activeTab === 'sheets' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-50 text-emerald-600'}`}>
+                          <FileSpreadsheet className="w-4 h-4" />
                         </div>
-                        {activeTab === 'sheets' && (
-                          <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                        )}
-                      </button>
-                    )}
+                        <div className="text-left">
+                          <div className="text-xs font-bold">Google Sheets</div>
+                          <div className="text-[10px] text-slate-500 font-normal">Base de datos y sincronización</div>
+                        </div>
+                      </div>
+                      {activeTab === 'sheets' && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      )}
+                    </button>
 
                     {/* Function 2: Paletas (3) */}
                     {onOpenThemeModal && (
@@ -282,9 +309,8 @@ export const Header: React.FC<HeaderProps> = ({
                     />
                   </div>
 
-                  {/* Function 3: Google Account / Conectar Sheets (solo Administrador) */}
-                  {isAdmin && (
-                    <div className="pt-1.5 mt-1 border-t border-slate-100">
+                  {/* Function 3: Google Account / Conectar Sheets */}
+                  <div className="pt-1.5 mt-1 border-t border-slate-100">
                       {user ? (
                         <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200/70">
                           <div className="flex items-center gap-2 min-w-0">
@@ -351,7 +377,6 @@ export const Header: React.FC<HeaderProps> = ({
                         </button>
                       )}
                     </div>
-                  )}
                 </div>
               )}
             </div>
@@ -415,6 +440,31 @@ export const Header: React.FC<HeaderProps> = ({
             <Network className="w-3.5 h-3.5 shrink-0" />
             <span>Organigrama</span>
           </button>
+          <button
+            onClick={() => onTabChange('credenciales')}
+            className={`whitespace-nowrap px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'credenciales'
+                ? 'bg-white text-slate-900 font-bold shadow-xs'
+                : 'bg-white/15 text-white/90 border border-white/20 hover:bg-white/25'
+            }`}
+          >
+            <KeyRound className="w-3.5 h-3.5 shrink-0" />
+            <span>Credenciales Drog</span>
+          </button>
+          {customDatabases.map((db) => (
+            <button
+              key={db.id}
+              onClick={() => onTabChange(db.id)}
+              className={`whitespace-nowrap px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                activeTab === db.id
+                  ? 'bg-white text-slate-900 font-bold shadow-xs'
+                  : 'bg-white/15 text-white/90 border border-white/20 hover:bg-white/25'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 shrink-0" />
+              <span>{db.name}</span>
+            </button>
+          ))}
         </nav>
       </div>
     </header>

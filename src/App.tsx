@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import rawReps from './data/representantes.json';
 import rawGds from './data/gerentes.json';
+import rawCredenciales from './data/credencialesDroguerias.json';
 import {
   Representante,
   GerenteDistrito,
+  CredencialDrogueria,
+  CustomDatabase,
   ActiveTab,
   ViewMode,
   isRepComercial,
@@ -15,6 +18,8 @@ import { MetricStrip } from './components/MetricStrip';
 import { TypeSelector } from './components/TypeSelector';
 import { RepresentantesList } from './components/RepresentantesList';
 import { GerentesList } from './components/GerentesList';
+import { CredencialesDrogueriasView } from './components/CredencialesDrogueriasView';
+import { CustomDatabaseView } from './components/CustomDatabaseView';
 import { HierarchyTree } from './components/HierarchyTree';
 import { CoverageMap } from './components/CoverageMap';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
@@ -41,9 +46,10 @@ import {
   syncRepToSpreadsheet,
   deleteRepFromSpreadsheet,
   getOrCreateCanonicalSpreadsheet,
+  fetchGenericSpreadsheet,
 } from './services/sheetsService';
 import { exportToCsvFile } from './utils/phoneUtils';
-import { exportRepsToExcel, exportGdsToExcel, getStandardRegion } from './utils/excelExport';
+import { exportRepsToExcel, exportGdsToExcel, exportCredencialesToExcel, getStandardRegion } from './utils/excelExport';
 import {
   Pill,
   CheckCircle2,
@@ -201,6 +207,87 @@ export default function App() {
     return rawList;
   });
 
+  // Credenciales Droguerías state
+  const STORAGE_CREDENCIALES_KEY = 'calox_credenciales_droguerias_v1';
+  const [credencialesData, setCredencialesData] = useState<CredencialDrogueria[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CREDENCIALES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Error loading credenciales from localStorage:', e);
+    }
+    return rawCredenciales as CredencialDrogueria[];
+  });
+
+  const handleDeleteCredencial = (credId: string) => {
+    setCredencialesData((prev) => {
+      const updated = prev.filter((c) => c.id !== credId);
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving credenciales to localStorage:', e);
+      }
+      return updated;
+    });
+    setSyncToast({
+      type: 'info',
+      message: 'Credencial eliminada correctamente.',
+    });
+  };
+
+  const handleToggleCredencialStatus = (credId: string) => {
+    setCredencialesData((prev) => {
+      let targetName = '';
+      let nextStatus = '';
+      const updated = prev.map((c) => {
+        if (c.id === credId) {
+          targetName = c.representante;
+          const currentIsActivo = (c.estatus || 'ACTIVO').toUpperCase() === 'ACTIVO';
+          nextStatus = currentIsActivo ? 'Desactivar' : 'Activo';
+          return { ...c, estatus: nextStatus };
+        }
+        return c;
+      });
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving credenciales status to localStorage:', e);
+      }
+      setSyncToast({
+        type: 'success',
+        message: `Usuario "${targetName}" marcado como ${nextStatus}.`,
+      });
+      return updated;
+    });
+  };
+
+  const handleBatchToggleCredencialStatus = (credIds: string[], newStatus: 'Activo' | 'Desactivar') => {
+    setCredencialesData((prev) => {
+      const idSet = new Set(credIds);
+      const updated = prev.map((c) => {
+        if (idSet.has(c.id)) {
+          return { ...c, estatus: newStatus };
+        }
+        return c;
+      });
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving batch credenciales status to localStorage:', e);
+      }
+      return updated;
+    });
+    setSyncToast({
+      type: 'success',
+      message: `${credIds.length} usuarios marcados como ${newStatus}.`,
+    });
+  };
+
   // App navigation state
   const [activeTab, setActiveTab] = useState<ActiveTab>('reps');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -305,6 +392,80 @@ export default function App() {
     }, 4500);
     return () => clearTimeout(timer);
   }, [syncToast]);
+
+  // Custom databases created by user to generate new menus
+  const STORAGE_CUSTOM_DBS_KEY = 'calox_custom_databases_v1';
+  const [customDatabases, setCustomDatabases] = useState<CustomDatabase[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CUSTOM_DBS_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error('Error loading custom databases from localStorage:', e);
+    }
+    return [];
+  });
+
+  const handleAddCustomDatabase = (db: CustomDatabase) => {
+    const updated = [...customDatabases, db];
+    setCustomDatabases(updated);
+    try {
+      localStorage.setItem(STORAGE_CUSTOM_DBS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error saving custom databases to localStorage:', e);
+    }
+    setActiveTab(db.id);
+    setSyncToast({
+      type: 'success',
+      message: `Menú "${db.name}" agregado con éxito (${db.totalRows} registros).`,
+    });
+  };
+
+  const handleDeleteCustomDatabase = (id: string) => {
+    const updated = customDatabases.filter(d => d.id !== id);
+    setCustomDatabases(updated);
+    try {
+      localStorage.setItem(STORAGE_CUSTOM_DBS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Error deleting custom database from localStorage:', e);
+    }
+    if (activeTab === id) {
+      setActiveTab('sheets');
+    }
+    setSyncToast({
+      type: 'success',
+      message: 'Menú eliminado correctamente.',
+    });
+  };
+
+  const handleSyncCustomDatabase = async (id: string) => {
+    const target = customDatabases.find(d => d.id === id);
+    if (!target || !target.spreadsheetId) return;
+    setIsPullSyncing(true);
+    try {
+      const res = await fetchGenericSpreadsheet(target.spreadsheetId, target.sheetTabName);
+      const updatedDb: CustomDatabase = {
+        ...target,
+        headers: res.headers,
+        rows: res.rows,
+        totalRows: res.rows.length,
+        lastSyncedAt: new Date().toISOString(),
+      };
+      const updatedList = customDatabases.map(d => (d.id === id ? updatedDb : d));
+      setCustomDatabases(updatedList);
+      localStorage.setItem(STORAGE_CUSTOM_DBS_KEY, JSON.stringify(updatedList));
+      setSyncToast({
+        type: 'success',
+        message: `"${target.name}" sincronizado con éxito (${res.rows.length} registros).`,
+      });
+    } catch (err: any) {
+      setSyncToast({
+        type: 'error',
+        message: err?.message || 'Error al sincronizar base de datos.',
+      });
+    } finally {
+      setIsPullSyncing(false);
+    }
+  };
 
   // Pull sync: download latest additions & updates from Google Sheets into the app
   // Pull sync: download latest additions & updates from Google Sheets into the app
@@ -630,10 +791,15 @@ export default function App() {
         setUser(res.user);
       }
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.info('Aviso de inicio de sesión:', err?.message || err);
+      const isCancelled =
+        err?.message?.includes('cancelado') ||
+        err?.message?.includes('popup') ||
+        err?.message?.includes('closed');
       setLoginError(
-        err?.message ||
-        'Error al conectar con Google. Si tu navegador bloqueó la ventana emergente, por favor autorízala.'
+        isCancelled
+          ? 'La ventana de Google fue cerrada o cancelada. Puedes volver a intentarlo o usar el Modo Directo.'
+          : (err?.message || 'Error al conectar con Google.')
       );
     } finally {
       setIsLoggingIn(false);
@@ -1066,7 +1232,9 @@ export default function App() {
 
   const handleExportExcel = async () => {
     try {
-      if (activeTab === 'gds') {
+      if (activeTab === 'credenciales') {
+        await exportCredencialesToExcel(credencialesData, 'Credenciales_Droguerias.xlsx');
+      } else if (activeTab === 'gds') {
         await exportGdsToExcel(filteredGds, 'Gerentes_Distrito_Calox.xlsx');
       } else {
         await exportRepsToExcel(filteredReps, 'Agenda de Representantes.xlsx');
@@ -1097,11 +1265,12 @@ export default function App() {
         onAddRep={isAdmin ? handleOpenCreateRep : undefined}
         onAddGd={isAdmin ? handleOpenCreateGd : undefined}
         totalRepsCount={activeRepsData.length}
+        totalCredencialesCount={credencialesData.length}
+        customDatabases={customDatabases}
         isAdmin={isAdmin}
         onOpenAdminModal={() => setIsAdminModalOpen(true)}
         onLogoutAdmin={() => {
           setIsAdmin(false);
-          if (activeTab === 'sheets') setActiveTab('reps');
           setSyncToast({
             type: 'info',
             message: 'Sesión cambiada a modo Invitado (Solo lectura).',
@@ -1337,15 +1506,32 @@ export default function App() {
           />
         )}
 
+        {/* Feature 8: Credenciales de Droguerías */}
+        {activeTab === 'credenciales' && (
+          <CredencialesDrogueriasView
+            credenciales={credencialesData}
+            isAdmin={isAdmin}
+            onDeleteCredencial={isAdmin ? handleDeleteCredencial : undefined}
+            onToggleStatus={handleToggleCredencialStatus}
+            onBatchToggleStatus={handleBatchToggleCredencialStatus}
+            onExportExcel={handleExportExcel}
+          />
+        )}
+
         {activeTab === 'sheets' && (
           <GoogleSheetsSync
             user={user}
             onLogin={handleLogin}
             onLogout={handleLogout}
+            onLoginAsGuest={(guestUser) => setUser(guestUser)}
             isLoggingIn={isLoggingIn}
             loginError={loginError}
             reps={repsData}
             gds={gdsData}
+            credenciales={credencialesData}
+            customDatabases={customDatabases}
+            onAddCustomDatabase={handleAddCustomDatabase}
+            onDeleteCustomDatabase={handleDeleteCustomDatabase}
             linkedSheet={linkedSheet}
             onUpdateLinkedSheet={(info) => {
               setLinkedSheet(info);
@@ -1357,6 +1543,20 @@ export default function App() {
             syncError={syncError}
           />
         )}
+
+        {/* Custom Menus created from external databases */}
+        {customDatabases.map((db) => (
+          activeTab === db.id ? (
+            <CustomDatabaseView
+              key={db.id}
+              database={db}
+              isAdmin={isAdmin}
+              onDeleteDatabase={handleDeleteCustomDatabase}
+              onSyncDatabase={handleSyncCustomDatabase}
+              isSyncing={isPullSyncing}
+            />
+          ) : null
+        ))}
       </main>
 
       {/* 6. Contact Detail Modal */}
@@ -1464,7 +1664,6 @@ export default function App() {
         }}
         onLogoutAdmin={() => {
           setIsAdmin(false);
-          if (activeTab === 'sheets') setActiveTab('reps');
           setSyncToast({
             type: 'info',
             message: 'Sesión cambiada a modo Invitado (Solo lectura).',
