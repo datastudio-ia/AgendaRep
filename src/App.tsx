@@ -25,6 +25,7 @@ import { RepFormModal } from './components/RepFormModal';
 import { GdFormModal } from './components/GdFormModal';
 import { ThemeSelectorModal } from './components/ThemeSelectorModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { ThemeId, APP_THEMES } from './types/theme';
 import {
   AuthUser,
@@ -1021,6 +1022,9 @@ export default function App() {
       className="min-h-screen w-full max-w-full overflow-x-hidden flex flex-col transition-colors duration-200"
       style={{ backgroundColor: 'var(--app-bg)', color: 'var(--app-text)' }}
     >
+      {/* 0. Offline Mode Banner for PWA */}
+      <OfflineIndicator />
+
       {/* 1. Header with Branding, Role Switching & Theme Switching */}
       <Header
         activeTab={activeTab}

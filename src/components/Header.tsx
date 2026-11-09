@@ -3,6 +3,7 @@ import { AuthUser } from '../services/firebaseAuth';
 import { ActiveTab } from '../types/contact';
 import { ThemeId, APP_THEMES } from '../types/theme';
 import { LogOut, FileSpreadsheet, Users, UserCheck, Network, Compass, BarChart3, Palette, Settings, ShieldCheck, Lock, Eye } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -127,8 +128,9 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Zone 3: Perfil de Usuario (Invitado / Administrador) y Configuración */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Zone 3: Instalar App (PWA), Perfil de Usuario (Invitado / Administrador) y Configuración */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <PWAInstallButton variant="header" />
             {onOpenAdminModal && (
               <button
                 type="button"
@@ -153,9 +155,6 @@ export const Header: React.FC<HeaderProps> = ({
                   <>
                     <Eye className="w-3.5 h-3.5 shrink-0" />
                     <span>Invitado</span>
-                    <span className="hidden sm:inline text-[10px] font-medium opacity-85">
-                      (Solo lectura)
-                    </span>
                   </>
                 )}
               </button>
@@ -276,6 +275,12 @@ export const Header: React.FC<HeaderProps> = ({
                         </div>
                       </button>
                     )}
+
+                    {/* Function 2.5: Instalar Aplicación Móvil (PWA) */}
+                    <PWAInstallButton
+                      variant="menu"
+                      onActionComplete={() => setIsConfigOpen(false)}
+                    />
                   </div>
 
                   {/* Function 3: Google Account / Conectar Sheets (solo Administrador) */}
