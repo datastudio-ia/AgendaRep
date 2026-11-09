@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Representante, GerenteDistrito, isRepComercial } from '../types/contact';
 import {
   X,
@@ -47,6 +47,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal está abierto
+  useEffect(() => {
+    if (!contact) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [contact]);
 
   if (!contact) return null;
 
@@ -99,22 +114,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     <Tag className="w-2.5 h-2.5 shrink-0" />
                     <span>Sector: {contact.codigoSector || 'N/A'}</span>
                   </div>
-                  {isRep && rep && (
-                    <div
-                      className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full border shadow-2xs ${
-                        isRepComercial(rep)
-                          ? 'bg-emerald-500/30 text-white border-emerald-300'
-                          : 'bg-blue-500/30 text-white border-blue-300'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isRepComercial(rep) ? 'bg-emerald-300' : 'bg-blue-300'
-                        }`}
-                      />
-                      <span>{isRepComercial(rep) ? 'Comercial' : 'Visita Médica'}</span>
-                    </div>
-                  )}
                   <div className="inline-flex items-center gap-1 text-[10px] font-semibold text-white/95 bg-black/20 px-2 py-0.5 rounded-full border border-white/15">
                     <MapPin className="w-2.5 h-2.5 shrink-0 text-white/90" />
                     <span className="truncate max-w-[150px]">{locationDisplay}</span>
@@ -138,32 +137,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
             {/* Header action buttons row */}
             <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-white/15">
-              {!isRep && gd && onEditGd && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onEditGd(gd);
-                  }}
-                  className="py-1 px-2.5 flex items-center gap-1 rounded-lg bg-white/20 hover:bg-white text-white hover:text-theme-primary text-xs font-bold transition-all cursor-pointer border border-white/25"
-                >
-                  <Pencil className="w-3 h-3 shrink-0" />
-                  <span>Editar</span>
-                </button>
-              )}
-
-              {isRep && rep && onEditRep && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onEditRep(rep);
-                  }}
-                  className="py-1 px-2.5 flex items-center gap-1 rounded-lg bg-white/20 hover:bg-white text-white hover:text-theme-primary text-xs font-bold transition-all cursor-pointer border border-white/25"
-                >
-                  <Pencil className="w-3 h-3 shrink-0" />
-                  <span>Editar</span>
-                </button>
-              )}
-
               {isRep && rep && onDeleteRep && (
                 <button
                   onClick={() => setIsConfirmingDelete(true)}

@@ -200,9 +200,9 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
     <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full overflow-x-hidden">
       {/* 1. Header del Directorio Unificado */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 sm:gap-5 w-full max-w-full">
-        {/* Fila superior: Título del Directorio, Botón Filtros/Exportar y Botón Agregar */}
+        {/* Fila superior: Título del Directorio y Botón Agregar (en PC superior derecha) */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 w-full">
-          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl theme-gradient-bg text-white flex items-center justify-center shadow-2xs shrink-0">
               <Users className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -214,20 +214,6 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
                 Fuerza de ventas comercial y visita médica
               </p>
             </div>
-
-            {/* Botón Filtros / Exportar: Ubicado al lado derecho del enunciado */}
-            <button
-              type="button"
-              onClick={() => {
-                setModalIsExportOnly(true);
-                setIsExcelExportModalOpen(true);
-              }}
-              className="inline-flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-3 sm:px-3.5 rounded-xl sm:rounded-full text-xs font-bold transition-all cursor-pointer select-none bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 shadow-2xs shrink-0 ml-0 sm:ml-2"
-              title="Filtros y Exportación a Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="whitespace-nowrap">Filtros / Exportar</span>
-            </button>
           </div>
 
           {/* Botón Agregar Representante (en PC, ubicado en la parte superior derecha del recuadro) */}
@@ -243,9 +229,9 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
           )}
         </div>
 
-        {/* Fila 2: Controles (Móvil: Modo, Agregar, Buscador | PC: Buscador a la izquierda, Modo a la derecha) */}
+        {/* Fila 2: Controles (Móvil: Modo, Agregar, Buscador | PC: Buscador a la izquierda, Modo y Filtros/Exportar a la derecha) */}
         <div className="pt-2 sm:pt-4 border-t border-[#EAE5E1]/80 w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
-          {/* En Móvil: 1er Lugar (Modo y Filtros/Exportar) | En PC: 2do Lugar (Modo Tarjetas / Tabla a la derecha) */}
+          {/* En Móvil: 1er Lugar (Modo y Filtros/Exportar) | En PC: 2do Lugar (Modo Tarjetas / Tabla y Filtros / Exportar alineados a la derecha) */}
           <div className="order-1 sm:order-2 flex items-center gap-1.5 sm:gap-2 shrink-0 flex-nowrap w-full sm:w-auto justify-between sm:justify-start py-0.5">
             {onViewModeChange && (
               <div className="inline-flex bg-[#F8F4F2] p-0.5 sm:p-1 rounded-xl sm:rounded-full border border-[#EAE5E1] shrink-0">
@@ -278,18 +264,18 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
               </div>
             )}
 
-            {/* Botón Filtros/Exportar (en Móvil se mantiene aquí; en PC está en la fila de filtros) */}
+            {/* Botón Filtros / Exportar: alineado al lado derecho junto al botón de tarjeta / tabla */}
             <button
               type="button"
               onClick={() => {
-                setModalIsExportOnly(false);
+                setModalIsExportOnly(true);
                 setIsExcelExportModalOpen(true);
               }}
-              className="sm:hidden flex items-center justify-center gap-1.5 py-1.5 px-2.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all cursor-pointer shadow-2xs shrink-0"
-              title="Filtros/Exportar"
+              className="inline-flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-3 sm:px-3.5 rounded-xl sm:rounded-full text-xs font-bold transition-all cursor-pointer select-none bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 shadow-2xs shrink-0"
+              title="Filtros y Exportación a Excel"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="whitespace-nowrap">Filtros/Exportar</span>
+              <span className="whitespace-nowrap">Filtros / Exportar</span>
               {activeFilterCount > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white ml-0.5">
                   {activeFilterCount}

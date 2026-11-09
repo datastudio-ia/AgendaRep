@@ -424,6 +424,21 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
     setShowDeleteConfirm(false);
   }, [repToEdit, isOpen]);
 
+  // Bloquear desplazamiento del fondo cuando el modal está abierto
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleRegionChange = (newReg: string) => {
