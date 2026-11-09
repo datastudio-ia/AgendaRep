@@ -221,20 +221,10 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
               <button
                 onClick={onAddCredencial}
                 className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 bg-theme-primary hover:bg-theme-primary-hover text-white text-xs sm:text-sm font-bold rounded-xl sm:rounded-full shadow-2xs transition-all cursor-pointer shrink-0"
+                title="Agregar representante con su usuario y clave"
               >
                 <Plus className="w-4 h-4" />
-                <span>Nueva Credencial</span>
-              </button>
-            )}
-
-            {onExportExcel && (
-              <button
-                onClick={onExportExcel}
-                className="inline-flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-3 sm:px-3.5 rounded-xl sm:rounded-full border border-emerald-300 text-xs font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer shadow-2xs shrink-0"
-                title="Exportar listado a Excel"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Exportar Excel</span>
+                <span>Agregar Usuario</span>
               </button>
             )}
           </div>
@@ -366,7 +356,7 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
             <div className="h-6 w-px bg-slate-300 mx-1 shrink-0" />
 
             {/* Filtro Estatus al lado de los filtros de droguerías */}
-            <div className="flex items-center gap-1.5 shrink-0 bg-[#F8F4F2] px-2.5 sm:px-3 py-1.5 rounded-xl sm:rounded-full border border-[#EAE5E1]">
+            <div className="flex items-center gap-1.5 shrink-0 bg-[#F8F4F2] px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-full border border-[#EAE5E1]">
               <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               <span className="text-[11px] font-bold text-slate-500">Estatus:</span>
               <select
@@ -379,6 +369,19 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
                 <option value="desactivar">Desactivar ({totalInactivas})</option>
               </select>
             </div>
+
+            {/* Botón Exportar Excel alineado al lado derecho del filtro de estatus */}
+            {onExportExcel && (
+              <button
+                type="button"
+                onClick={onExportExcel}
+                className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-full border border-emerald-300 text-xs font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all cursor-pointer shadow-2xs shrink-0"
+                title="Exportar listado a Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Excel</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -549,27 +552,33 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
 
                 {/* Footer de la tarjeta con acciones si es admin */}
                 {isAdmin && (onEditCredencial || onDeleteCredencial) && (
-                  <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100">
-                    {onEditCredencial && (
-                      <button
-                        type="button"
-                        onClick={() => onEditCredencial(cred)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                        title="Editar credencial"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    {onDeleteCredencial && (
-                      <button
-                        type="button"
-                        onClick={() => onDeleteCredencial(cred.id)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="Eliminar credencial"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
+                  <div className="flex items-center justify-between gap-1.5 pt-2.5 border-t border-slate-100 mt-1">
+                    <span className="text-[10px] font-semibold text-slate-400">
+                      Administrador
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {onEditCredencial && (
+                        <button
+                          type="button"
+                          onClick={() => onEditCredencial(cred)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer shadow-2xs"
+                          title="Editar representante y credenciales de usuario"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Editar</span>
+                        </button>
+                      )}
+                      {onDeleteCredencial && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteCredencial(cred.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Eliminar credencial"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -701,10 +710,11 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
                               <button
                                 type="button"
                                 onClick={() => onEditCredencial(cred)}
-                                className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-slate-100"
-                                title="Editar"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 cursor-pointer transition-colors"
+                                title="Editar representante con su usuario"
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                <Pencil className="w-3 h-3 text-blue-600" />
+                                <span>Editar</span>
                               </button>
                             )}
                             {onDeleteCredencial && (

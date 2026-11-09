@@ -28,6 +28,7 @@ import { GoogleSheetsSync } from './components/GoogleSheetsSync';
 import { ContactModal } from './components/ContactModal';
 import { RepFormModal } from './components/RepFormModal';
 import { GdFormModal } from './components/GdFormModal';
+import { CredencialModal } from './components/CredencialModal';
 import { ThemeSelectorModal } from './components/ThemeSelectorModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -64,6 +65,8 @@ import {
   LayoutGrid,
   Table2,
   FileSpreadsheet,
+  Lock,
+  KeyRound,
 } from 'lucide-react';
 
 export const REGION_OPTIONS = [
@@ -374,6 +377,54 @@ export default function App() {
     }
     setGdToEdit(gd);
     setIsGdFormOpen(true);
+  };
+
+  // Credencial Droguería Form Modal state (Create & Edit)
+  const [isCredencialModalOpen, setIsCredencialModalOpen] = useState(false);
+  const [credencialToEdit, setCredencialToEdit] = useState<CredencialDrogueria | null>(null);
+
+  const handleOpenCreateCredencial = () => {
+    if (!isAdmin) {
+      setIsAdminModalOpen(true);
+      return;
+    }
+    setCredencialToEdit(null);
+    setIsCredencialModalOpen(true);
+  };
+
+  const handleOpenEditCredencial = (cred: CredencialDrogueria) => {
+    if (!isAdmin) {
+      setIsAdminModalOpen(true);
+      return;
+    }
+    setCredencialToEdit(cred);
+    setIsCredencialModalOpen(true);
+  };
+
+  const handleSaveCredencial = (savedCred: CredencialDrogueria) => {
+    setCredencialesData((prev) => {
+      const index = prev.findIndex((c) => c.id === savedCred.id);
+      let updated: CredencialDrogueria[];
+      if (index >= 0) {
+        updated = [...prev];
+        updated[index] = savedCred;
+      } else {
+        updated = [savedCred, ...prev];
+      }
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving credencial to localStorage:', e);
+      }
+      return updated;
+    });
+
+    setSyncToast({
+      type: 'success',
+      message: credencialToEdit
+        ? `Credencial de "${savedCred.representante}" (${savedCred.drogueria}) actualizada.`
+        : `Representante "${savedCred.representante}" agregado con éxito para ${savedCred.drogueria}.`,
+    });
   };
 
   // Google Sheets integration state
@@ -1271,6 +1322,9 @@ export default function App() {
         onOpenAdminModal={() => setIsAdminModalOpen(true)}
         onLogoutAdmin={() => {
           setIsAdmin(false);
+          if (activeTab === 'credenciales') {
+            setActiveTab('reps');
+          }
           setSyncToast({
             type: 'info',
             message: 'Sesión cambiada a modo Invitado (Solo lectura).',
@@ -1506,16 +1560,39 @@ export default function App() {
           />
         )}
 
-        {/* Feature 8: Credenciales de Droguerías */}
+        {/* Feature 8: Credenciales de Droguerías (Solo Administrador) */}
         {activeTab === 'credenciales' && (
-          <CredencialesDrogueriasView
-            credenciales={credencialesData}
-            isAdmin={isAdmin}
-            onDeleteCredencial={isAdmin ? handleDeleteCredencial : undefined}
-            onToggleStatus={handleToggleCredencialStatus}
-            onBatchToggleStatus={handleBatchToggleCredencialStatus}
-            onExportExcel={handleExportExcel}
-          />
+          isAdmin ? (
+            <CredencialesDrogueriasView
+              credenciales={credencialesData}
+              isAdmin={isAdmin}
+              onAddCredencial={handleOpenCreateCredencial}
+              onEditCredencial={handleOpenEditCredencial}
+              onDeleteCredencial={handleDeleteCredencial}
+              onToggleStatus={handleToggleCredencialStatus}
+              onBatchToggleStatus={handleBatchToggleCredencialStatus}
+              onExportExcel={handleExportExcel}
+            />
+          ) : (
+            <div className="bg-white rounded-3xl border border-[#EAE5E1] p-8 sm:p-12 text-center max-w-lg mx-auto my-8 shadow-xs">
+              <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3">
+                <Lock className="w-7 h-7" />
+              </div>
+              <h3 className="text-lg font-black text-[#1A1A1E]">
+                Acceso Exclusivo para Administrador
+              </h3>
+              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                El menú de Credenciales de Droguerías contiene información confidencial de accesos comerciales. Está reservado únicamente para usuarios administradores.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsAdminModalOpen(true)}
+                className="mt-5 px-5 py-2.5 theme-gradient-bg text-white rounded-full text-xs font-bold shadow-xs hover:opacity-95 transition-all cursor-pointer"
+              >
+                Ingresar como Administrador
+              </button>
+            </div>
+          )
         )}
 
         {activeTab === 'sheets' && (
@@ -1664,11 +1741,23 @@ export default function App() {
         }}
         onLogoutAdmin={() => {
           setIsAdmin(false);
+          if (activeTab === 'credenciales') {
+            setActiveTab('reps');
+          }
           setSyncToast({
             type: 'info',
             message: 'Sesión cambiada a modo Invitado (Solo lectura).',
           });
         }}
+      />
+
+      {/* 11. Modal para Agregar y Editar Credenciales de Droguerías (Solo Administrador) */}
+      <CredencialModal
+        isOpen={isCredencialModalOpen}
+        onClose={() => setIsCredencialModalOpen(false)}
+        onSave={handleSaveCredencial}
+        credencialToEdit={credencialToEdit}
+        reps={repsData}
       />
     </div>
   );

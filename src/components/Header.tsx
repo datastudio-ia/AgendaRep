@@ -130,17 +130,19 @@ export const Header: React.FC<HeaderProps> = ({
               <Network className="w-3.5 h-3.5" />
               <span>Organigrama</span>
             </button>
-            <button
-              onClick={() => onTabChange('credenciales')}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'credenciales'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-white/90 hover:text-white hover:bg-white/15'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>Credenciales Drog</span>
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => onTabChange('credenciales')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'credenciales'
+                    ? 'bg-white text-slate-900 shadow-xs font-bold'
+                    : 'text-white/90 hover:text-white hover:bg-white/15'
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Credenciales Drog</span>
+              </button>
+            )}
             {customDatabases.map((db) => (
               <button
                 key={db.id}
@@ -440,17 +442,19 @@ export const Header: React.FC<HeaderProps> = ({
             <Network className="w-3.5 h-3.5 shrink-0" />
             <span>Organigrama</span>
           </button>
-          <button
-            onClick={() => onTabChange('credenciales')}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-              activeTab === 'credenciales'
-                ? 'bg-white text-slate-900 font-bold shadow-xs'
-                : 'bg-white/15 text-white/90 border border-white/20 hover:bg-white/25'
-            }`}
-          >
-            <KeyRound className="w-3.5 h-3.5 shrink-0" />
-            <span>Credenciales Drog</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onTabChange('credenciales')}
+              className={`whitespace-nowrap px-3 py-1.5 rounded-full transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                activeTab === 'credenciales'
+                  ? 'bg-white text-slate-900 font-bold shadow-xs'
+                  : 'bg-white/15 text-white/90 border border-white/20 hover:bg-white/25'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5 shrink-0" />
+              <span>Credenciales Drog</span>
+            </button>
+          )}
           {customDatabases.map((db) => (
             <button
               key={db.id}
