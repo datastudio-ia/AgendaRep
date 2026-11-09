@@ -20,6 +20,7 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
+  Calendar,
 } from 'lucide-react';
 
 interface ExcelExportModalProps {
@@ -44,6 +45,13 @@ interface ExcelExportModalProps {
   selectedCoordinadores?: string[];
   onCoordinadoresChange?: (coordinadores: string[]) => void;
   coordinadorOptions?: MultiSelectOption[] | string[];
+  selectedDateYears?: string[];
+  onDateYearsChange?: (years: string[]) => void;
+  dateYearOptions?: MultiSelectOption[];
+  dateStart?: string;
+  onDateStartChange?: (date: string) => void;
+  dateEnd?: string;
+  onDateEndChange?: (date: string) => void;
   onClearFilters?: () => void;
 }
 
@@ -68,6 +76,13 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   selectedCoordinadores = [],
   onCoordinadoresChange,
   coordinadorOptions = [],
+  selectedDateYears = [],
+  onDateYearsChange,
+  dateYearOptions = [],
+  dateStart = '',
+  onDateStartChange,
+  dateEnd = '',
+  onDateEndChange,
   onClearFilters,
 }) => {
   const [activeTab, setActiveTab] = useState<'filtros' | 'campos'>('filtros');
@@ -79,6 +94,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const [localUnits, setLocalUnits] = useState<string[]>(selectedUnits);
   const [localGerentes, setLocalGerentes] = useState<string[]>(selectedGerentes);
   const [localCoordinadores, setLocalCoordinadores] = useState<string[]>(selectedCoordinadores);
+  const [localDateYears, setLocalDateYears] = useState<string[]>(selectedDateYears);
+  const [localDateStart, setLocalDateStart] = useState<string>(dateStart);
+  const [localDateEnd, setLocalDateEnd] = useState<string>(dateEnd);
 
   // Selected column keys for Excel (defaults to all 12 columns)
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<string[]>(
@@ -96,6 +114,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
       setLocalUnits(selectedUnits);
       setLocalGerentes(selectedGerentes);
       setLocalCoordinadores(selectedCoordinadores);
+      setLocalDateYears(selectedDateYears);
+      setLocalDateStart(dateStart);
+      setLocalDateEnd(dateEnd);
     }
   }, [isOpen]);
 
@@ -119,6 +140,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const effectiveUnits = isExportOnly ? localUnits : selectedUnits;
   const effectiveGerentes = isExportOnly ? localGerentes : selectedGerentes;
   const effectiveCoordinadores = isExportOnly ? localCoordinadores : selectedCoordinadores;
+  const effectiveDateYears = isExportOnly ? localDateYears : selectedDateYears;
+  const effectiveDateStart = isExportOnly ? localDateStart : dateStart;
+  const effectiveDateEnd = isExportOnly ? localDateEnd : dateEnd;
 
   const setEffectiveTypes = (vals: string[]) => {
     if (isExportOnly) setLocalTypes(vals);
@@ -140,6 +164,18 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
     if (isExportOnly) setLocalCoordinadores(vals);
     else onCoordinadoresChange?.(vals);
   };
+  const setEffectiveDateYears = (vals: string[]) => {
+    if (isExportOnly) setLocalDateYears(vals);
+    else onDateYearsChange?.(vals);
+  };
+  const setEffectiveDateStart = (val: string) => {
+    if (isExportOnly) setLocalDateStart(val);
+    else onDateStartChange?.(val);
+  };
+  const setEffectiveDateEnd = (val: string) => {
+    if (isExportOnly) setLocalDateEnd(val);
+    else onDateEndChange?.(val);
+  };
 
   const handleClearModalFilters = () => {
     if (isExportOnly) {
@@ -148,6 +184,9 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
       setLocalUnits([]);
       setLocalGerentes([]);
       setLocalCoordinadores([]);
+      setLocalDateYears([]);
+      setLocalDateStart('');
+      setLocalDateEnd('');
     } else {
       onClearFilters?.();
     }
@@ -194,9 +233,43 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
         if (!matchesG && !matchesC) return false;
       }
 
+      // 4. Fecha de Ingreso: Años seleccionados
+      if (effectiveDateYears.length > 0) {
+        const parts = (rep.fechaIngreso || '').trim().split('/');
+        const year = parts.length === 3 ? parts[2] : '';
+        if (!effectiveDateYears.includes(year)) {
+          return false;
+        }
+      }
+
+      // 5. Fecha de Ingreso: Rango de Fechas específico (Desde / Hasta)
+      if (effectiveDateStart || effectiveDateEnd) {
+        const repDateStr = (rep.fechaIngreso || '').trim();
+        const parts = repDateStr.split('/');
+        if (parts.length === 3) {
+          const repIso = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          if (effectiveDateStart && repIso < effectiveDateStart) return false;
+          if (effectiveDateEnd && repIso > effectiveDateEnd) return false;
+        } else if (effectiveDateStart || effectiveDateEnd) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [baseReps, reps, isExportOnly, effectiveTypes, effectiveRegions, effectiveUnits, effectiveGerentes, effectiveCoordinadores]);
+  }, [
+    baseReps,
+    reps,
+    isExportOnly,
+    effectiveTypes,
+    effectiveRegions,
+    effectiveUnits,
+    effectiveGerentes,
+    effectiveCoordinadores,
+    effectiveDateYears,
+    effectiveDateStart,
+    effectiveDateEnd,
+  ]);
 
   if (!isOpen) return null;
 
@@ -208,13 +281,16 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
   const normUnits = normalizeOptions(unitOptions);
   const normGerentes = normalizeOptions(gerenteOptions);
   const normCoords = normalizeOptions(coordinadorOptions);
+  const normDateYears = normalizeOptions(dateYearOptions);
 
   const activeFilterCount =
     effectiveTypes.length +
     effectiveRegions.length +
     effectiveUnits.length +
     effectiveGerentes.length +
-    effectiveCoordinadores.length;
+    effectiveCoordinadores.length +
+    effectiveDateYears.length +
+    (effectiveDateStart || effectiveDateEnd ? 1 : 0);
 
   const toggleColumn = (key: string) => {
     setSelectedColumnKeys((prev) =>
@@ -672,6 +748,100 @@ export const ExcelExportModal: React.FC<ExcelExportModalProps> = ({
                         </button>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+
+              {/* 6. Fecha de Ingreso */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedSection(expandedSection === 'fecha' ? null : 'fecha')
+                  }
+                  className="w-full p-3 flex items-center justify-between text-left font-bold text-xs text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-emerald-600" />
+                    <span>Fecha de Ingreso</span>
+                    {(effectiveDateYears.length > 0 || effectiveDateStart || effectiveDateEnd) && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px]">
+                        {effectiveDateYears.length + (effectiveDateStart || effectiveDateEnd ? 1 : 0)}
+                      </span>
+                    )}
+                  </div>
+                  {expandedSection === 'fecha' ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  )}
+                </button>
+                {expandedSection === 'fecha' && (
+                  <div className="p-3 pt-0 border-t border-slate-100 space-y-3">
+                    {/* Años de ingreso */}
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                        Por Año de Ingreso
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                        {normDateYears.map((opt) => {
+                          const isSelected = effectiveDateYears.includes(opt.value);
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() =>
+                                toggleArrayItem(effectiveDateYears, opt.value, setEffectiveDateYears)
+                              }
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-emerald-600 text-white shadow-2xs'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3" />}
+                              <span>{opt.label}</span>
+                              {typeof opt.count === 'number' && (
+                                <span
+                                  className={`text-[10px] font-mono px-1 py-0.2 rounded-full ${
+                                    isSelected ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-600'
+                                  }`}
+                                >
+                                  {opt.count}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Rango Desde / Hasta */}
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                        Rango de Fechas (Desde / Hasta)
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Desde</label>
+                          <input
+                            type="date"
+                            value={effectiveDateStart}
+                            onChange={(e) => setEffectiveDateStart(e.target.value)}
+                            className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Hasta</label>
+                          <input
+                            type="date"
+                            value={effectiveDateEnd}
+                            onChange={(e) => setEffectiveDateEnd(e.target.value)}
+                            className="w-full text-xs px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

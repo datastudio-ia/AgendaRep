@@ -212,6 +212,9 @@ export default function App() {
   const [selectedUnits, setSelectedUnits] = useState<string[]>([]);
   const [selectedGerentes, setSelectedGerentes] = useState<string[]>([]);
   const [selectedCoordinadores, setSelectedCoordinadores] = useState<string[]>([]);
+  const [selectedDateYears, setSelectedDateYears] = useState<string[]>([]);
+  const [dateStart, setDateStart] = useState<string>('');
+  const [dateEnd, setDateEnd] = useState<string>('');
 
   // Modal inspection state
   const [selectedContact, setSelectedContact] = useState<
@@ -825,6 +828,25 @@ export default function App() {
     });
   }, [activeRepsData, currentCoordinadoresList]);
 
+  // Fecha de Ingreso: Año de ingreso options with counts (ONLY active reps)
+  const dateYearSelectOptions = useMemo(() => {
+    const yearCounts: Record<string, number> = {};
+    activeRepsData.forEach((rep) => {
+      const parts = (rep.fechaIngreso || '').trim().split('/');
+      const year = parts.length === 3 ? parts[2] : '';
+      if (year) {
+        yearCounts[year] = (yearCounts[year] || 0) + 1;
+      }
+    });
+    return Object.keys(yearCounts)
+      .sort((a, b) => Number(b) - Number(a))
+      .map((year) => ({
+        label: year,
+        value: year,
+        count: yearCounts[year],
+      }));
+  }, [activeRepsData]);
+
   // Filtered Reps (Multi-select) sorted alphabetically by name
   const filteredReps = useMemo(() => {
     const filtered = repsData.filter((rep) => {
@@ -867,10 +889,33 @@ export default function App() {
         if (!matchesG && !matchesC) return false;
       }
 
-      // 4. Search term
+      // 4. Fecha de Ingreso: Filtrado por Años seleccionados
+      if (selectedDateYears.length > 0) {
+        const parts = (rep.fechaIngreso || '').trim().split('/');
+        const year = parts.length === 3 ? parts[2] : '';
+        if (!selectedDateYears.includes(year)) {
+          return false;
+        }
+      }
+
+      // 5. Fecha de Ingreso: Rango de Fechas específico (Desde / Hasta)
+      if (dateStart || dateEnd) {
+        const repDateStr = (rep.fechaIngreso || '').trim();
+        const parts = repDateStr.split('/');
+        if (parts.length === 3) {
+          // DD/MM/YYYY -> YYYY-MM-DD
+          const repIso = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          if (dateStart && repIso < dateStart) return false;
+          if (dateEnd && repIso > dateEnd) return false;
+        } else if (dateStart || dateEnd) {
+          return false;
+        }
+      }
+
+      // 6. Search term
       if (searchTerm) {
         const terms = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean);
-        const searchableText = `${rep.nombre} ${rep.cedula} ${rep.ciudad} ${rep.estado} ${rep.region} ${getMappedUnit(rep.unidadNegocio)} ${rep.gerenteDistrito} ${rep.codigoSector} ${rep.telefono} ${rep.correo}`.toLowerCase();
+        const searchableText = `${rep.nombre} ${rep.cedula} ${rep.ciudad} ${rep.estado} ${rep.region} ${getMappedUnit(rep.unidadNegocio)} ${rep.gerenteDistrito} ${rep.codigoSector} ${rep.telefono} ${rep.correo} ${rep.fechaIngreso || ''}`.toLowerCase();
         const allTermsMatch = terms.every((t) => searchableText.includes(t));
         if (!allTermsMatch) return false;
       }
@@ -878,7 +923,18 @@ export default function App() {
       return true;
     });
     return sortRepsAlphabetically(filtered);
-  }, [repsData, searchTerm, selectedTypes, selectedRegions, selectedUnits, selectedGerentes, selectedCoordinadores]);
+  }, [
+    repsData,
+    searchTerm,
+    selectedTypes,
+    selectedRegions,
+    selectedUnits,
+    selectedGerentes,
+    selectedCoordinadores,
+    selectedDateYears,
+    dateStart,
+    dateEnd,
+  ]);
 
 
   // Segmented filtered representatives
@@ -950,6 +1006,9 @@ export default function App() {
     setSelectedUnits([]);
     setSelectedGerentes([]);
     setSelectedCoordinadores([]);
+    setSelectedDateYears([]);
+    setDateStart('');
+    setDateEnd('');
   };
 
   const handleSelectRep = (rep: Representante) => {
@@ -1115,6 +1174,13 @@ export default function App() {
               selectedCoordinadores={selectedCoordinadores}
               onCoordinadoresChange={setSelectedCoordinadores}
               coordinadorOptions={coordinadorSelectOptions}
+              selectedDateYears={selectedDateYears}
+              onDateYearsChange={setSelectedDateYears}
+              dateYearOptions={dateYearSelectOptions}
+              dateStart={dateStart}
+              onDateStartChange={setDateStart}
+              dateEnd={dateEnd}
+              onDateEndChange={setDateEnd}
               onClearFilters={handleClearFilters}
             />
           </div>

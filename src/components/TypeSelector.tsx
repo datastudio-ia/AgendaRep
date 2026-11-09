@@ -3,6 +3,7 @@ import { Representante, ViewMode, isRepComercial, isRepActive } from '../types/c
 import { RepresentantesList } from './RepresentantesList';
 import { LinkedSpreadsheetInfo } from '../services/sheetsService';
 import { MultiSelectDropdown, MultiSelectOption } from './MultiSelectDropdown';
+import { DateFilterDropdown } from './DateFilterDropdown';
 import { ExcelExportModal } from './ExcelExportModal';
 import { getMappedUnit } from '../App';
 import {
@@ -19,6 +20,7 @@ import {
   X,
   Printer,
   RotateCcw,
+  Calendar,
 } from 'lucide-react';
 
 interface TypeSelectorProps {
@@ -67,6 +69,13 @@ interface TypeSelectorProps {
   selectedCoordinadores?: string[];
   onCoordinadoresChange?: (values: string[]) => void;
   coordinadorOptions?: MultiSelectOption[] | string[];
+  selectedDateYears?: string[];
+  onDateYearsChange?: (years: string[]) => void;
+  dateYearOptions?: MultiSelectOption[];
+  dateStart?: string;
+  onDateStartChange?: (date: string) => void;
+  dateEnd?: string;
+  onDateEndChange?: (date: string) => void;
   onClearFilters?: () => void;
 }
 
@@ -114,6 +123,13 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
   selectedCoordinadores = [],
   onCoordinadoresChange,
   coordinadorOptions,
+  selectedDateYears = [],
+  onDateYearsChange,
+  dateYearOptions = [],
+  dateStart = '',
+  onDateStartChange,
+  dateEnd = '',
+  onDateEndChange,
   onClearFilters,
 }) => {
   const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false);
@@ -124,7 +140,9 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
     selectedRegions.length +
     selectedUnits.length +
     selectedGerentes.length +
-    selectedCoordinadores.length;
+    selectedCoordinadores.length +
+    selectedDateYears.length +
+    (dateStart || dateEnd ? 1 : 0);
 
   const hasActiveFilters =
     Boolean(searchTerm) ||
@@ -132,7 +150,9 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
     selectedRegions.length > 0 ||
     selectedUnits.length > 0 ||
     selectedGerentes.length > 0 ||
-    selectedCoordinadores.length > 0;
+    selectedCoordinadores.length > 0 ||
+    selectedDateYears.length > 0 ||
+    Boolean(dateStart || dateEnd);
   // Combine all representatives into a single unified directory list sorted alphabetically
   const unifiedReps = useMemo(() => {
     const baseList = reps ? reps : [...repsComerciales, ...repsVisitaMedica];
@@ -180,9 +200,9 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
     <div className="flex flex-col gap-3 sm:gap-6 w-full max-w-full overflow-x-hidden">
       {/* 1. Header del Directorio Unificado */}
       <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 sm:gap-5 w-full max-w-full">
-        {/* Fila superior: Título del Directorio y Botón Agregar (en PC superior derecha) */}
-        <div className="flex items-center justify-between gap-2.5 sm:gap-4 w-full">
-          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+        {/* Fila superior: Título del Directorio, Botón Filtros/Exportar y Botón Agregar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 w-full">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl theme-gradient-bg text-white flex items-center justify-center shadow-2xs shrink-0">
               <Users className="w-4 h-4 sm:w-6 sm:h-6" />
             </div>
@@ -194,6 +214,20 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
                 Fuerza de ventas comercial y visita médica
               </p>
             </div>
+
+            {/* Botón Filtros / Exportar: Ubicado al lado derecho del enunciado */}
+            <button
+              type="button"
+              onClick={() => {
+                setModalIsExportOnly(true);
+                setIsExcelExportModalOpen(true);
+              }}
+              className="inline-flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-3 sm:px-3.5 rounded-xl sm:rounded-full text-xs font-bold transition-all cursor-pointer select-none bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 shadow-2xs shrink-0 ml-0 sm:ml-2"
+              title="Filtros y Exportación a Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="whitespace-nowrap">Filtros / Exportar</span>
+            </button>
           </div>
 
           {/* Botón Agregar Representante (en PC, ubicado en la parte superior derecha del recuadro) */}
@@ -364,7 +398,21 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
               />
             )}
 
-            {/* 6. Botón Quitar Filtro */}
+            {/* 6. Filtro por Fecha de Ingreso */}
+            {dateYearOptions && onDateYearsChange && (
+              <DateFilterDropdown
+                label="Fecha de Ingreso"
+                yearOptions={dateYearOptions}
+                selectedYears={selectedDateYears}
+                onYearsChange={onDateYearsChange}
+                dateStart={dateStart}
+                onDateStartChange={onDateStartChange}
+                dateEnd={dateEnd}
+                onDateEndChange={onDateEndChange}
+              />
+            )}
+
+            {/* 7. Botón Quitar Filtro */}
             {onClearFilters && (
               <button
                 type="button"
@@ -380,20 +428,6 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
                 <span>Quitar Filtro</span>
               </button>
             )}
-
-            {/* 7. Botón Filtros/Exportar (en PC al derecho del botón Quitar Filtro, es decir al final) */}
-            <button
-              type="button"
-              onClick={() => {
-                setModalIsExportOnly(true);
-                setIsExcelExportModalOpen(true);
-              }}
-              className="w-auto text-xs rounded-full px-3.5 py-2 font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 select-none bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 shadow-2xs shrink-0"
-              title="Filtros de Exportación a Excel"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span className="whitespace-nowrap">Filtros/Exportar</span>
-            </button>
           </div>
         )}
       </div>
@@ -420,6 +454,13 @@ export const TypeSelector: React.FC<TypeSelectorProps> = ({
         selectedCoordinadores={selectedCoordinadores}
         onCoordinadoresChange={onCoordinadoresChange}
         coordinadorOptions={coordinadorOptions}
+        selectedDateYears={selectedDateYears}
+        onDateYearsChange={onDateYearsChange}
+        dateYearOptions={dateYearOptions}
+        dateStart={dateStart}
+        onDateStartChange={onDateStartChange}
+        dateEnd={dateEnd}
+        onDateEndChange={onDateEndChange}
         onClearFilters={onClearFilters}
       />
 
