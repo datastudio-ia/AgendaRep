@@ -128,9 +128,8 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* Zone 3: Instalar App (PWA), Perfil de Usuario (Invitado / Administrador) y Configuración */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <PWAInstallButton variant="header" />
+          {/* Zone 3: Perfil de Usuario (Invitado / Administrador) y Configuración */}
+          <div className="flex items-center gap-2 shrink-0">
             {onOpenAdminModal && (
               <button
                 type="button"
