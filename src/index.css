@@ -215,3 +215,12 @@
   scrollbar-width: none;
 }
 
+/* Global modal scroll lock */
+html.overflow-hidden,
+body.overflow-hidden {
+  overflow: hidden !important;
+  height: 100% !important;
+  touch-action: none !important;
+  overscroll-behavior: none !important;
+}
+

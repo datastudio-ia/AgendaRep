@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ShieldCheck, Lock, User, Eye, EyeOff, X, AlertCircle, UserCheck } from 'lucide-react';
 
 interface AdminLoginModalProps {
@@ -33,20 +34,8 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     }
   }, [isOpen]);
 
-  // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal está abierto
-  useEffect(() => {
-    if (!isOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    const originalTouchAction = document.body.style.touchAction;
-
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.touchAction = originalTouchAction;
-    };
-  }, [isOpen]);
+  // Bloquear scroll del fondo (scroll lock) reutilizable mientras el modal esté abierto
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 

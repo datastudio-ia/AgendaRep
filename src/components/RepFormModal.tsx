@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { Representante, isRepComercial } from '../types/contact';
 import {
   X,
@@ -424,20 +425,8 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
     setShowDeleteConfirm(false);
   }, [repToEdit, isOpen]);
 
-  // Bloquear desplazamiento del fondo cuando el modal está abierto
-  useEffect(() => {
-    if (!isOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    const originalTouchAction = document.body.style.touchAction;
-
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.touchAction = originalTouchAction;
-    };
-  }, [isOpen]);
+  // Bloquear scroll del fondo (scroll lock) reutilizable mientras el modal esté abierto
+  useBodyScrollLock(isOpen);
 
   if (!isOpen) return null;
 
@@ -690,11 +679,11 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs overflow-hidden overscroll-none animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-xl max-h-[96vh] sm:max-h-[92vh] flex flex-col overflow-x-hidden overflow-y-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-xl max-h-[90vh] flex flex-col overflow-hidden overscroll-contain my-auto animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - Fixed Header */}
@@ -724,7 +713,7 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
         {/* Form - Flex container with scrollable fields */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 w-full max-w-full overflow-hidden">
           {/* Scrollable Fields Body (1 col on mobile, 2 cols on desktop) */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 space-y-3 sm:space-y-4 w-full max-w-full">
+          <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden p-3 sm:p-5 space-y-3 sm:space-y-4 w-full max-w-full">
             {error && (
               <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 w-full">
                 <AlertCircle className="w-4 h-4 shrink-0" />

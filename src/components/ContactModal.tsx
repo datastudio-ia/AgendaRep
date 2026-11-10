@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { Representante, GerenteDistrito, isRepComercial } from '../types/contact';
 import {
   X,
@@ -49,19 +50,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal está abierto
-  useEffect(() => {
-    if (!contact) return;
-    const originalOverflow = document.body.style.overflow;
-    const originalTouchAction = document.body.style.touchAction;
-
-    document.body.style.overflow = 'hidden';
-    document.body.style.touchAction = 'none';
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.body.style.touchAction = originalTouchAction;
-    };
-  }, [contact]);
+  useBodyScrollLock(Boolean(contact));
 
   if (!contact) return null;
 
@@ -94,11 +83,11 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/45 backdrop-blur-xs overflow-hidden"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs overflow-hidden overscroll-none animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-md max-h-[96vh] overflow-x-hidden overflow-y-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col my-auto"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-md max-h-[90vh] overflow-x-hidden overflow-y-auto overscroll-contain animate-in zoom-in-95 duration-150 flex flex-col my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header bar in Theme Gradient */}

@@ -1825,50 +1825,58 @@ export default function App() {
       </main>
 
       {/* 6. Contact Detail Modal */}
-      <ContactModal
-        contact={selectedContact}
-        isRep={isRepModal}
-        onClose={() => setSelectedContact(null)}
-        onSelectManager={handleSelectManagerFromModal}
-        onEditRep={isAdmin ? handleOpenEditRep : undefined}
-        onEditGd={isAdmin ? handleOpenEditGd : undefined}
-        onDeleteRep={isAdmin ? handleDeleteRep : undefined}
-        onDeleteGd={isAdmin ? handleDeleteGd : undefined}
-      />
+      {selectedContact && (
+        <ContactModal
+          contact={selectedContact}
+          isRep={isRepModal}
+          onClose={() => setSelectedContact(null)}
+          onSelectManager={handleSelectManagerFromModal}
+          onEditRep={isAdmin ? handleOpenEditRep : undefined}
+          onEditGd={isAdmin ? handleOpenEditGd : undefined}
+          onDeleteRep={isAdmin ? handleDeleteRep : undefined}
+          onDeleteGd={isAdmin ? handleDeleteGd : undefined}
+        />
+      )}
 
       {/* 7. PDF Export & Printable Guide Modal (Feature 6) */}
-      <PdfExportModal
-        isOpen={isPdfModalOpen}
-        onClose={() => setIsPdfModalOpen(false)}
-        reps={repsData}
-        gds={gdsData}
-      />
+      {isPdfModalOpen && (
+        <PdfExportModal
+          isOpen={isPdfModalOpen}
+          onClose={() => setIsPdfModalOpen(false)}
+          reps={repsData}
+          gds={gdsData}
+        />
+      )}
 
       {/* 8. Representative Form Modal (Create / Edit) */}
-      <RepFormModal
-        isOpen={isRepFormOpen}
-        onClose={() => setIsRepFormOpen(false)}
-        onSave={handleSaveRep}
-        onDelete={handleDeleteRep}
-        repToEdit={repToEdit}
-        existingReps={repsData}
-        linkedSheet={linkedSheet}
-        isAuthenticated={Boolean(user)}
-        isSavingToSheets={isSavingToSheets}
-      />
+      {isRepFormOpen && (
+        <RepFormModal
+          isOpen={isRepFormOpen}
+          onClose={() => setIsRepFormOpen(false)}
+          onSave={handleSaveRep}
+          onDelete={handleDeleteRep}
+          repToEdit={repToEdit}
+          existingReps={repsData}
+          linkedSheet={linkedSheet}
+          isAuthenticated={Boolean(user)}
+          isSavingToSheets={isSavingToSheets}
+        />
+      )}
 
       {/* 9. Gerente / Coordinador Form Modal (Create / Edit) */}
-      <GdFormModal
-        isOpen={isGdFormOpen}
-        onClose={() => {
-          setIsGdFormOpen(false);
-          setGdToEdit(null);
-        }}
-        onSave={handleSaveGd}
-        onDelete={handleDeleteGd}
-        gdToEdit={gdToEdit}
-        reps={repsData}
-      />
+      {isGdFormOpen && (
+        <GdFormModal
+          isOpen={isGdFormOpen}
+          onClose={() => {
+            setIsGdFormOpen(false);
+            setGdToEdit(null);
+          }}
+          onSave={handleSaveGd}
+          onDelete={handleDeleteGd}
+          gdToEdit={gdToEdit}
+          reps={repsData}
+        />
+      )}
 
       {/* 9. Floating Sync Toast Notification */}
       {syncToast && (
@@ -1901,52 +1909,58 @@ export default function App() {
       )}
 
       {/* 9. Theme / Palette Switcher Modal */}
-      <ThemeSelectorModal
-        isOpen={isThemeModalOpen}
-        onClose={() => setIsThemeModalOpen(false)}
-        currentTheme={currentTheme}
-        onSelectTheme={(theme) => {
-          setCurrentTheme(theme);
-          try {
-            localStorage.setItem('calox_theme', theme);
-          } catch (e) {
-            console.error('Failed to save theme in localStorage:', e);
-          }
-        }}
-      />
+      {isThemeModalOpen && (
+        <ThemeSelectorModal
+          isOpen={isThemeModalOpen}
+          onClose={() => setIsThemeModalOpen(false)}
+          currentTheme={currentTheme}
+          onSelectTheme={(theme) => {
+            setCurrentTheme(theme);
+            try {
+              localStorage.setItem('calox_theme', theme);
+            } catch (e) {
+              console.error('Failed to save theme in localStorage:', e);
+            }
+          }}
+        />
+      )}
 
       {/* 10. User Role / Admin Access Modal */}
-      <AdminLoginModal
-        isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
-        isAdmin={isAdmin}
-        onLoginSuccess={() => {
-          setIsAdmin(true);
-          setSyncToast({
-            type: 'success',
-            message: 'Acceso concedido como Administrador (Administrador26). Edición habilitada.',
-          });
-        }}
-        onLogoutAdmin={() => {
-          setIsAdmin(false);
-          if (activeTab === 'credenciales') {
-            setActiveTab('reps');
-          }
-          setSyncToast({
-            type: 'info',
-            message: 'Sesión cambiada a modo Invitado (Solo lectura).',
-          });
-        }}
-      />
+      {isAdminModalOpen && (
+        <AdminLoginModal
+          isOpen={isAdminModalOpen}
+          onClose={() => setIsAdminModalOpen(false)}
+          isAdmin={isAdmin}
+          onLoginSuccess={() => {
+            setIsAdmin(true);
+            setSyncToast({
+              type: 'success',
+              message: 'Acceso concedido como Administrador (Administrador26). Edición habilitada.',
+            });
+          }}
+          onLogoutAdmin={() => {
+            setIsAdmin(false);
+            if (activeTab === 'credenciales') {
+              setActiveTab('reps');
+            }
+            setSyncToast({
+              type: 'info',
+              message: 'Sesión cambiada a modo Invitado (Solo lectura).',
+            });
+          }}
+        />
+      )}
 
       {/* 11. Modal para Agregar y Editar Credenciales de Droguerías (Solo Administrador) */}
-      <CredencialModal
-        isOpen={isCredencialModalOpen}
-        onClose={() => setIsCredencialModalOpen(false)}
-        onSave={handleSaveCredencial}
-        credencialToEdit={credencialToEdit}
-        reps={repsData}
-      />
+      {isCredencialModalOpen && (
+        <CredencialModal
+          isOpen={isCredencialModalOpen}
+          onClose={() => setIsCredencialModalOpen(false)}
+          onSave={handleSaveCredencial}
+          credencialToEdit={credencialToEdit}
+          reps={repsData}
+        />
+      )}
     </div>
   );
 }
