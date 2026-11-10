@@ -1,4 +1,4 @@
-import { Representante, GerenteDistrito, isRepComercial } from '../types/contact';
+import { Representante, GerenteDistrito, CredencialDrogueria, isRepComercial } from '../types/contact';
 import { getAccessToken } from './firebaseAuth';
 import { getMappedUnit } from '../App';
 import { getStandardRegion } from '../utils/excelExport';
@@ -77,6 +77,19 @@ export const CALOX_GD_HEADERS = [
   'Cargo',
   'Supervisor',
   'Fecha de Ingreso',
+  'Estatus',
+];
+
+export const CALOX_CREDENCIALES_HEADERS = [
+  'Droguería',
+  'Representante',
+  'Cédula',
+  'Cargo',
+  'Región',
+  'Correo',
+  'Usuario',
+  'Contraseña',
+  'Portal URL',
   'Estatus',
 ];
 
@@ -160,6 +173,56 @@ export const repToRowByHeaders = (r: Representante, headers?: string[]): string[
 
 export const repToRowArray = (r: Representante): string[] => {
   return repToRowByHeaders(r, CALOX_REP_HEADERS);
+};
+
+export const gdToRowByHeaders = (g: GerenteDistrito, headers?: string[]): string[] => {
+  const targetHeaders = headers && headers.length > 0 ? headers : CALOX_GD_HEADERS;
+  return targetHeaders.map((h) => {
+    const lower = (h || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    if (lower.includes('codigo') || lower.includes('sector')) return g.codigoSector || '';
+    if (lower.includes('cedula') || lower === 'ci' || lower === 'c.i.') return g.cedula || '';
+    if (lower.includes('lider') || lower.includes('gerente') || lower.includes('nombre')) return g.nombre || '';
+    if (lower.includes('tel') || lower.includes('cel') || lower.includes('movil')) return g.telefono || '';
+    if (lower.includes('correo') || lower.includes('mail')) return g.correo || '';
+    if (lower.includes('ciudad')) return g.ciudad || '';
+    if (lower === 'estado' || lower.includes('estado geografico') || lower.includes('entidad')) return g.estado || '';
+    if (lower.includes('region')) return getStandardRegion(g.region || '');
+    if (lower.includes('cargo') || lower.includes('puesto')) return g.cargo || '';
+    if (lower.includes('supervisor')) return g.supervisor || '';
+    if (lower.includes('fecha') || lower.includes('ingreso')) return g.fechaIngreso || '';
+    if (lower.includes('estatus') || lower.includes('status')) return g.status || 'ACTIVO';
+    return '';
+  });
+};
+
+export const credToRowByHeaders = (c: CredencialDrogueria, headers?: string[]): string[] => {
+  const targetHeaders = headers && headers.length > 0 ? headers : CALOX_CREDENCIALES_HEADERS;
+  return targetHeaders.map((h) => {
+    const lower = (h || '')
+      .toString()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+    if (lower.includes('drogueria') || lower.includes('drog')) return c.drogueria || '';
+    if (lower.includes('representante') || lower.includes('nombre') || lower.includes('asesor')) return c.representante || '';
+    if (lower.includes('cedula') || lower === 'ci' || lower === 'c.i.') return c.cedula || '';
+    if (lower.includes('cargo')) return c.cargo || '';
+    if (lower.includes('region')) return c.region || '';
+    if (lower.includes('correo') || lower.includes('mail')) return c.correo || '';
+    if (lower.includes('usuario') || lower.includes('login') || lower.includes('user')) return c.usuario || '';
+    if (lower.includes('clave') || lower.includes('password') || lower.includes('contrasena')) return c.password || '';
+    if (lower.includes('portal') || lower.includes('url') || lower.includes('link')) return c.portalUrl || '';
+    if (lower.includes('estatus') || lower.includes('status')) return c.estatus || 'Activo';
+    return '';
+  });
 };
 
 /**
@@ -1048,6 +1111,503 @@ export async function deleteRepFromSpreadsheet(
     }
   } catch (err) {
     console.error('Error deleting row from spreadsheet:', err);
+  }
+  return false;
+}
+
+/**
+ * Ensures that a given tab exists in the Google Spreadsheet.
+ * If not, it creates the tab and initializes it with the provided default headers.
+ */
+export async function ensureSheetTabExists(
+  spreadsheetId: string,
+  desiredTabName: string,
+  defaultHeaders: string[]
+): Promise<string> {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Token de Google no disponible.');
+
+  const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!metaRes.ok) {
+    const errText = await metaRes.text();
+    throw new Error(`Error al inspeccionar la hoja (${metaRes.status}): ${errText}`);
+  }
+
+  const metaData = await metaRes.json();
+  const sheets: Array<{ properties: { sheetId: number; title: string } }> = metaData.sheets || [];
+
+  const found = sheets.find(
+    (s) =>
+      s.properties.title.toLowerCase().trim() === desiredTabName.toLowerCase().trim() ||
+      s.properties.title
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim() ===
+        desiredTabName
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim()
+  );
+
+  if (found) {
+    return found.properties.title;
+  }
+
+  // Create the sheet tab
+  const addRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: desiredTabName,
+              gridProperties: {
+                frozenRowCount: 1,
+              },
+            },
+          },
+        },
+      ],
+    }),
+  });
+
+  if (!addRes.ok) {
+    const errText = await addRes.text();
+    console.error('Error adding sheet tab:', errText);
+    throw new Error(`Error al crear la pestaña "${desiredTabName}" (${addRes.status}): ${errText}`);
+  }
+
+  // Initialize header row
+  const endCol = columnIndexToLetter(defaultHeaders.length);
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
+      desiredTabName
+    )}!A1:${endCol}1?valueInputOption=USER_ENTERED`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        values: [defaultHeaders],
+      }),
+    }
+  );
+
+  return desiredTabName;
+}
+
+/**
+ * PUSH SYNC GD: When adding or editing a Gerente de Distrito / Coordinador,
+ * insert or update the corresponding row in the linked Google Sheet.
+ */
+export async function syncGdToSpreadsheet(
+  spreadsheetId: string,
+  gd: GerenteDistrito,
+  tabName?: string
+): Promise<PushSyncResult> {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Debes iniciar sesión con Google para sincronizar con la hoja.');
+
+  const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Gerentes de Distrito', CALOX_GD_HEADERS));
+
+  const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
+  const readRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (!readRes.ok) {
+    const err = await readRes.text();
+    throw new Error(`Error al verificar la hoja (${readRes.status}): ${err}`);
+  }
+
+  const readData = await readRes.json();
+  const rows: string[][] = readData.values || [];
+
+  const headers = rows.length > 0 ? rows[0] : CALOX_GD_HEADERS;
+  const colMap = buildHeaderColumnMap(headers);
+  const endColLetter = columnIndexToLetter(headers.length);
+
+  let targetRowIndex = -1;
+
+  const cleanCedula = gd.cedula?.replace(/\D/g, '') || '';
+  const cleanNombre = gd.nombre?.trim().toUpperCase() || '';
+
+  if (rows.length > 1) {
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const cedulaIdx = colMap['cedula'];
+      const nombreIdx = colMap['nombre'] !== undefined ? colMap['nombre'] : colMap['gerenteDistrito'];
+
+      const rowCedula = cedulaIdx !== undefined && row[cedulaIdx] ? String(row[cedulaIdx]).replace(/\D/g, '') : '';
+      const rowNombre = nombreIdx !== undefined && row[nombreIdx] ? String(row[nombreIdx]).trim().toUpperCase() : '';
+
+      const directCedulaMatch = cleanCedula && rowCedula && cleanCedula === rowCedula;
+      const directNombreMatch = cleanNombre && rowNombre && cleanNombre === rowNombre;
+      const anyCellCedulaMatch = cleanCedula && row.some(cell => String(cell).replace(/\D/g, '') === cleanCedula);
+      const anyCellNombreMatch = cleanNombre && row.some(cell => String(cell).trim().toUpperCase() === cleanNombre);
+
+      if (directCedulaMatch || directNombreMatch || anyCellCedulaMatch || anyCellNombreMatch) {
+        targetRowIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  const rowValues = gdToRowByHeaders(gd, headers);
+
+  if (targetRowIndex > 0) {
+    const updateRange = `${encodeURIComponent(targetTab)}!A${targetRowIndex}:${endColLetter}${targetRowIndex}`;
+    const updateRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          values: [rowValues],
+        }),
+      }
+    );
+
+    if (!updateRes.ok) {
+      const err = await updateRes.text();
+      throw new Error(`Error al actualizar fila de líder en Google Sheets (${updateRes.status}): ${err}`);
+    }
+
+    return {
+      action: 'updated',
+      rowNumber: targetRowIndex,
+      sheetTitle: targetTab,
+    };
+  } else {
+    const appendRange = `${encodeURIComponent(targetTab)}!A:${endColLetter}`;
+    const appendRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${appendRange}:append?valueInputOption=USER_ENTERED`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          values: [rowValues],
+        }),
+      }
+    );
+
+    if (!appendRes.ok) {
+      const err = await appendRes.text();
+      throw new Error(`Error al agregar fila de líder en Google Sheets (${appendRes.status}): ${err}`);
+    }
+
+    return {
+      action: 'created',
+      rowNumber: rows.length + 1,
+      sheetTitle: targetTab,
+    };
+  }
+}
+
+/**
+ * Removes a Gerente de Distrito row from Google Sheets when deleted from the app.
+ */
+export async function deleteGdFromSpreadsheet(
+  spreadsheetId: string,
+  gdId: string,
+  cedula?: string,
+  nombre?: string,
+  tabName?: string
+): Promise<boolean> {
+  const token = await getAccessToken();
+  if (!token) return false;
+
+  try {
+    const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Gerentes de Distrito', CALOX_GD_HEADERS));
+    const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
+    const readRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!readRes.ok) return false;
+
+    const readData = await readRes.json();
+    const rows: string[][] = readData.values || [];
+    if (rows.length <= 1) return false;
+
+    const headers = rows[0];
+    const colMap = buildHeaderColumnMap(headers);
+    const cleanCedula = cedula?.replace(/\D/g, '') || '';
+    const cleanNombre = nombre?.trim().toUpperCase() || '';
+
+    let targetRowIndex = -1;
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowCedula = colMap['cedula'] !== undefined && row[colMap['cedula']] ? String(row[colMap['cedula']]).replace(/\D/g, '') : '';
+      const rowNombre = colMap['nombre'] !== undefined && row[colMap['nombre']] ? String(row[colMap['nombre']]).trim().toUpperCase() : '';
+
+      if (
+        (cleanCedula && rowCedula === cleanCedula) ||
+        (cleanNombre && rowNombre === cleanNombre) ||
+        (cleanCedula && row.some(c => String(c).replace(/\D/g, '') === cleanCedula)) ||
+        (cleanNombre && row.some(c => String(c).trim().toUpperCase() === cleanNombre))
+      ) {
+        targetRowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (targetRowIndex > 0) {
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (metaRes.ok) {
+        const metaData = await metaRes.json();
+        const sheetObj = metaData.sheets?.find((s: any) => s.properties?.title === targetTab);
+        const numericSheetId = sheetObj?.properties?.sheetId || 0;
+
+        const delRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                deleteDimension: {
+                  range: {
+                    sheetId: numericSheetId,
+                    dimension: 'ROWS',
+                    startIndex: targetRowIndex - 1,
+                    endIndex: targetRowIndex,
+                  },
+                },
+              },
+            ],
+          }),
+        });
+        return delRes.ok;
+      }
+    }
+  } catch (err) {
+    console.error('Error deleting GD row from spreadsheet:', err);
+  }
+  return false;
+}
+
+/**
+ * PUSH SYNC CREDENCIAL: When adding or editing a Credencial Droguería,
+ * insert or update the corresponding row in Google Sheets.
+ */
+export async function syncCredencialToSpreadsheet(
+  spreadsheetId: string,
+  cred: CredencialDrogueria,
+  tabName?: string
+): Promise<PushSyncResult> {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Debes iniciar sesión con Google para sincronizar con la hoja.');
+
+  const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Credenciales Droguerías', CALOX_CREDENCIALES_HEADERS));
+
+  const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
+  const readRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (!readRes.ok) {
+    const err = await readRes.text();
+    throw new Error(`Error al verificar la hoja (${readRes.status}): ${err}`);
+  }
+
+  const readData = await readRes.json();
+  const rows: string[][] = readData.values || [];
+
+  const headers = rows.length > 0 ? rows[0] : CALOX_CREDENCIALES_HEADERS;
+  const endColLetter = columnIndexToLetter(headers.length);
+
+  let targetRowIndex = -1;
+
+  const cleanDrog = cred.drogueria?.trim().toUpperCase() || '';
+  const cleanUsuario = cred.usuario?.trim().toUpperCase() || '';
+  const cleanCedula = cred.cedula?.replace(/\D/g, '') || '';
+  const cleanNombre = cred.representante?.trim().toUpperCase() || '';
+
+  if (rows.length > 1) {
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowText = row.map(c => String(c).trim().toUpperCase());
+      const hasDrog = cleanDrog && rowText.some(c => c === cleanDrog);
+      const hasUser = cleanUsuario && rowText.some(c => c === cleanUsuario);
+      const hasCedula = cleanCedula && row.some(c => String(c).replace(/\D/g, '') === cleanCedula);
+      const hasNombre = cleanNombre && rowText.some(c => c === cleanNombre);
+
+      if ((hasDrog && hasUser) || (hasDrog && hasCedula) || (hasDrog && hasNombre)) {
+        targetRowIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  const rowValues = credToRowByHeaders(cred, headers);
+
+  if (targetRowIndex > 0) {
+    const updateRange = `${encodeURIComponent(targetTab)}!A${targetRowIndex}:${endColLetter}${targetRowIndex}`;
+    const updateRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          values: [rowValues],
+        }),
+      }
+    );
+
+    if (!updateRes.ok) {
+      const err = await updateRes.text();
+      throw new Error(`Error al actualizar credencial en Google Sheets (${updateRes.status}): ${err}`);
+    }
+
+    return {
+      action: 'updated',
+      rowNumber: targetRowIndex,
+      sheetTitle: targetTab,
+    };
+  } else {
+    const appendRange = `${encodeURIComponent(targetTab)}!A:${endColLetter}`;
+    const appendRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${appendRange}:append?valueInputOption=USER_ENTERED`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          values: [rowValues],
+        }),
+      }
+    );
+
+    if (!appendRes.ok) {
+      const err = await appendRes.text();
+      throw new Error(`Error al registrar credencial en Google Sheets (${appendRes.status}): ${err}`);
+    }
+
+    return {
+      action: 'created',
+      rowNumber: rows.length + 1,
+      sheetTitle: targetTab,
+    };
+  }
+}
+
+/**
+ * Removes a Credencial Droguería row from Google Sheets when deleted from the app.
+ */
+export async function deleteCredencialFromSpreadsheet(
+  spreadsheetId: string,
+  credId: string,
+  drogueria?: string,
+  usuario?: string,
+  cedula?: string,
+  representante?: string,
+  tabName?: string
+): Promise<boolean> {
+  const token = await getAccessToken();
+  if (!token) return false;
+
+  try {
+    const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Credenciales Droguerías', CALOX_CREDENCIALES_HEADERS));
+    const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
+    const readRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!readRes.ok) return false;
+
+    const readData = await readRes.json();
+    const rows: string[][] = readData.values || [];
+    if (rows.length <= 1) return false;
+
+    const cleanDrog = drogueria?.trim().toUpperCase() || '';
+    const cleanUsuario = usuario?.trim().toUpperCase() || '';
+    const cleanCedula = cedula?.replace(/\D/g, '') || '';
+    const cleanNombre = representante?.trim().toUpperCase() || '';
+
+    let targetRowIndex = -1;
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowText = row.map(c => String(c).trim().toUpperCase());
+      const hasDrog = cleanDrog && rowText.some(c => c === cleanDrog);
+      const hasUser = cleanUsuario && rowText.some(c => c === cleanUsuario);
+      const hasCedula = cleanCedula && row.some(c => String(c).replace(/\D/g, '') === cleanCedula);
+      const hasNombre = cleanNombre && rowText.some(c => c === cleanNombre);
+
+      if ((hasDrog && hasUser) || (hasDrog && hasCedula) || (hasDrog && hasNombre)) {
+        targetRowIndex = i + 1;
+        break;
+      }
+    }
+
+    if (targetRowIndex > 0) {
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (metaRes.ok) {
+        const metaData = await metaRes.json();
+        const sheetObj = metaData.sheets?.find((s: any) => s.properties?.title === targetTab);
+        const numericSheetId = sheetObj?.properties?.sheetId || 0;
+
+        const delRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                deleteDimension: {
+                  range: {
+                    sheetId: numericSheetId,
+                    dimension: 'ROWS',
+                    startIndex: targetRowIndex - 1,
+                    endIndex: targetRowIndex,
+                  },
+                },
+              },
+            ],
+          }),
+        });
+        return delRes.ok;
+      }
+    }
+  } catch (err) {
+    console.error('Error deleting credencial row from spreadsheet:', err);
   }
   return false;
 }

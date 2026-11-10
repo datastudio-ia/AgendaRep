@@ -38,6 +38,7 @@ import {
   initAuth,
   googleSignIn,
   logout,
+  getAccessToken,
 } from './services/firebaseAuth';
 import {
   LinkedSpreadsheetInfo,
@@ -46,6 +47,10 @@ import {
   pullRepsFromSpreadsheet,
   syncRepToSpreadsheet,
   deleteRepFromSpreadsheet,
+  syncGdToSpreadsheet,
+  deleteGdFromSpreadsheet,
+  syncCredencialToSpreadsheet,
+  deleteCredencialFromSpreadsheet,
   getOrCreateCanonicalSpreadsheet,
   fetchGenericSpreadsheet,
 } from './services/sheetsService';
@@ -227,69 +232,7 @@ export default function App() {
     return rawCredenciales as CredencialDrogueria[];
   });
 
-  const handleDeleteCredencial = (credId: string) => {
-    setCredencialesData((prev) => {
-      const updated = prev.filter((c) => c.id !== credId);
-      try {
-        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Error saving credenciales to localStorage:', e);
-      }
-      return updated;
-    });
-    setSyncToast({
-      type: 'info',
-      message: 'Credencial eliminada correctamente.',
-    });
-  };
-
-  const handleToggleCredencialStatus = (credId: string) => {
-    setCredencialesData((prev) => {
-      let targetName = '';
-      let nextStatus = '';
-      const updated = prev.map((c) => {
-        if (c.id === credId) {
-          targetName = c.representante;
-          const currentIsActivo = (c.estatus || 'ACTIVO').toUpperCase() === 'ACTIVO';
-          nextStatus = currentIsActivo ? 'Desactivar' : 'Activo';
-          return { ...c, estatus: nextStatus };
-        }
-        return c;
-      });
-      try {
-        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Error saving credenciales status to localStorage:', e);
-      }
-      setSyncToast({
-        type: 'success',
-        message: `Usuario "${targetName}" marcado como ${nextStatus}.`,
-      });
-      return updated;
-    });
-  };
-
-  const handleBatchToggleCredencialStatus = (credIds: string[], newStatus: 'Activo' | 'Desactivar') => {
-    setCredencialesData((prev) => {
-      const idSet = new Set(credIds);
-      const updated = prev.map((c) => {
-        if (idSet.has(c.id)) {
-          return { ...c, estatus: newStatus };
-        }
-        return c;
-      });
-      try {
-        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.error('Error saving batch credenciales status to localStorage:', e);
-      }
-      return updated;
-    });
-    setSyncToast({
-      type: 'success',
-      message: `${credIds.length} usuarios marcados como ${newStatus}.`,
-    });
-  };
+  // Credenciales action handlers are defined below getActiveSpreadsheet with automatic Google Sheets synchronization
 
   // App navigation state
   const [activeTab, setActiveTab] = useState<ActiveTab>('reps');
@@ -401,7 +344,43 @@ export default function App() {
     setIsCredencialModalOpen(true);
   };
 
-  const handleSaveCredencial = (savedCred: CredencialDrogueria) => {
+  // Google Sheets integration state
+  const [linkedSheet, setLinkedSheet] = useState<LinkedSpreadsheetInfo | null>(() => getLinkedSpreadsheetInfo());
+  const [isPullSyncing, setIsPullSyncing] = useState(false);
+  const [isSavingToSheets, setIsSavingToSheets] = useState(false);
+  const [syncStats, setSyncStats] = useState<{ added: number; updated: number; unchanged: number; totalRemote: number } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  // Auto-dismiss notification toast
+  useEffect(() => {
+    if (!syncToast) return;
+    const timer = setTimeout(() => {
+      setSyncToast(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [syncToast]);
+
+  // Helper to get or connect the active canonical Google Sheets database
+  const getActiveSpreadsheet = async (): Promise<LinkedSpreadsheetInfo | null> => {
+    if (linkedSheet && linkedSheet.spreadsheetId) {
+      return linkedSheet;
+    }
+    const token = await getAccessToken();
+    if (!token) return null;
+    try {
+      const canonical = await getOrCreateCanonicalSpreadsheet(repsData, gdsData);
+      if (canonical) {
+        setLinkedSheet(canonical);
+        return canonical;
+      }
+    } catch (e) {
+      console.warn('No se pudo resolver la hoja canónica activa en Google Sheets:', e);
+    }
+    return null;
+  };
+
+  const handleSaveCredencial = async (savedCred: CredencialDrogueria) => {
     setCredencialesData((prev) => {
       const index = prev.findIndex((c) => c.id === savedCred.id);
       let updated: CredencialDrogueria[];
@@ -419,6 +398,27 @@ export default function App() {
       return updated;
     });
 
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet) {
+      try {
+        const credRes = await syncCredencialToSpreadsheet(activeSheet.spreadsheetId, savedCred);
+        setSyncToast({
+          type: 'success',
+          message: credRes.action === 'created'
+            ? `Credencial de "${savedCred.representante}" (${savedCred.drogueria}) agregada al aplicativo y a Google Sheets.`
+            : `Credencial de "${savedCred.representante}" (${savedCred.drogueria}) actualizada en Google Sheets.`,
+        });
+        return;
+      } catch (err: any) {
+        console.error('Error auto-syncing credencial to Google Sheets:', err);
+        setSyncToast({
+          type: 'error',
+          message: `Credencial guardada localmente. Error en Google Sheets: ${err.message}`,
+        });
+        return;
+      }
+    }
+
     setSyncToast({
       type: 'success',
       message: credencialToEdit
@@ -427,22 +427,131 @@ export default function App() {
     });
   };
 
-  // Google Sheets integration state
-  const [linkedSheet, setLinkedSheet] = useState<LinkedSpreadsheetInfo | null>(() => getLinkedSpreadsheetInfo());
-  const [isPullSyncing, setIsPullSyncing] = useState(false);
-  const [isSavingToSheets, setIsSavingToSheets] = useState(false);
-  const [syncStats, setSyncStats] = useState<{ added: number; updated: number; unchanged: number; totalRemote: number } | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
-  const [syncToast, setSyncToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const handleDeleteCredencial = async (credId: string) => {
+    const credToDelete = credencialesData.find((c) => c.id === credId);
+    setCredencialesData((prev) => {
+      const updated = prev.filter((c) => c.id !== credId);
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving credenciales to localStorage:', e);
+      }
+      return updated;
+    });
 
-  // Auto-dismiss notification toast
-  useEffect(() => {
-    if (!syncToast) return;
-    const timer = setTimeout(() => {
-      setSyncToast(null);
-    }, 4500);
-    return () => clearTimeout(timer);
-  }, [syncToast]);
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet && credToDelete) {
+      try {
+        await deleteCredencialFromSpreadsheet(
+          activeSheet.spreadsheetId,
+          credId,
+          credToDelete.drogueria,
+          credToDelete.representante,
+          credToDelete.cedula
+        );
+        setSyncToast({
+          type: 'info',
+          message: `Credencial de "${credToDelete.representante}" eliminada del aplicativo y de Google Sheets.`,
+        });
+        return;
+      } catch (e: any) {
+        console.error('Error removing credencial from Google Sheets:', e);
+        setSyncToast({
+          type: 'error',
+          message: `Credencial eliminada localmente. Error en Google Sheets: ${e.message}`,
+        });
+        return;
+      }
+    }
+
+    setSyncToast({
+      type: 'info',
+      message: 'Credencial eliminada correctamente.',
+    });
+  };
+
+  const handleToggleCredencialStatus = async (credId: string) => {
+    let updatedCred: CredencialDrogueria | null = null;
+    setCredencialesData((prev) => {
+      const updated = prev.map((c) => {
+        if (c.id === credId) {
+          const currentIsActivo = (c.estatus || 'ACTIVO').toUpperCase() === 'ACTIVO';
+          const nextStatus = currentIsActivo ? 'Desactivar' : 'Activo';
+          updatedCred = { ...c, estatus: nextStatus };
+          return updatedCred;
+        }
+        return c;
+      });
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving credenciales status to localStorage:', e);
+      }
+      return updated;
+    });
+
+    if (updatedCred) {
+      const activeSheet = await getActiveSpreadsheet();
+      if (activeSheet) {
+        try {
+          await syncCredencialToSpreadsheet(activeSheet.spreadsheetId, updatedCred);
+          setSyncToast({
+            type: (updatedCred as CredencialDrogueria).estatus === 'Activo' ? 'success' : 'info',
+            message: `Usuario "${(updatedCred as CredencialDrogueria).representante}" marcado como ${(updatedCred as CredencialDrogueria).estatus} (sincronizado en Google Sheets).`,
+          });
+          return;
+        } catch (e: any) {
+          console.error('Error auto-syncing credencial status to Google Sheets:', e);
+        }
+      }
+      setSyncToast({
+        type: (updatedCred as CredencialDrogueria).estatus === 'Activo' ? 'success' : 'info',
+        message: `Usuario "${(updatedCred as CredencialDrogueria).representante}" marcado como ${(updatedCred as CredencialDrogueria).estatus}.`,
+      });
+    }
+  };
+
+  const handleBatchToggleCredencialStatus = async (credIds: string[], newStatus: 'Activo' | 'Desactivar') => {
+    const affectedCreds: CredencialDrogueria[] = [];
+    setCredencialesData((prev) => {
+      const idSet = new Set(credIds);
+      const updated = prev.map((c) => {
+        if (idSet.has(c.id)) {
+          const up = { ...c, estatus: newStatus };
+          affectedCreds.push(up);
+          return up;
+        }
+        return c;
+      });
+      try {
+        localStorage.setItem(STORAGE_CREDENCIALES_KEY, JSON.stringify(updated));
+      } catch (e) {
+        console.error('Error saving batch credenciales status to localStorage:', e);
+      }
+      return updated;
+    });
+
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet && affectedCreds.length > 0) {
+      try {
+        for (const cred of affectedCreds) {
+          await syncCredencialToSpreadsheet(activeSheet.spreadsheetId, cred);
+        }
+        setSyncToast({
+          type: 'success',
+          message: `${credIds.length} usuarios marcados como ${newStatus} (sincronizados en Google Sheets).`,
+        });
+        return;
+      } catch (e: any) {
+        console.error('Error batch syncing credenciales to Google Sheets:', e);
+      }
+    }
+
+    setSyncToast({
+      type: 'success',
+      message: `${credIds.length} usuarios marcados como ${newStatus}.`,
+    });
+  };
 
   // Custom databases created by user to generate new menus
   const STORAGE_CUSTOM_DBS_KEY = 'calox_custom_databases_v1';
@@ -597,13 +706,13 @@ export default function App() {
     });
 
     // 2. Sincronizar automáticamente en la misma base de datos de Google Sheets
-    const shouldSync = syncToSheets || !!linkedSheet;
-    if (shouldSync && linkedSheet) {
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet) {
       setIsSavingToSheets(true);
       try {
-        const syncRes = await syncRepToSpreadsheet(linkedSheet.spreadsheetId, normalizedSavedRep, linkedSheet.sheetTabName);
+        const syncRes = await syncRepToSpreadsheet(activeSheet.spreadsheetId, normalizedSavedRep, activeSheet.sheetTabName);
         const updatedInfo: LinkedSpreadsheetInfo = {
-          ...linkedSheet,
+          ...activeSheet,
           lastSyncedAt: new Date().toISOString(),
         };
         setLinkedSheet(updatedInfo);
@@ -651,28 +760,35 @@ export default function App() {
     });
 
     // Sincronizar eliminación automáticamente en la misma base de datos de Google Sheets
-    if (linkedSheet && repToDelete) {
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet && repToDelete) {
       try {
         await deleteRepFromSpreadsheet(
-          linkedSheet.spreadsheetId,
+          activeSheet.spreadsheetId,
           repId,
           repToDelete.cedula,
           repToDelete.nombre,
-          linkedSheet.sheetTabName
+          activeSheet.sheetTabName
         );
         setSyncToast({
           type: 'info',
           message: `"${repToDelete.nombre}" eliminado del aplicativo y de Google Sheets.`,
         });
-      } catch (e) {
+        return;
+      } catch (e: any) {
         console.error('Error removing rep from Google Sheets:', e);
+        setSyncToast({
+          type: 'error',
+          message: `Representante eliminado localmente. Error en Google Sheets: ${e.message}`,
+        });
+        return;
       }
-    } else {
-      setSyncToast({
-        type: 'info',
-        message: 'Representante eliminado correctamente.',
-      });
     }
+
+    setSyncToast({
+      type: 'info',
+      message: 'Representante eliminado correctamente.',
+    });
   };
 
   const handleToggleRepStatus = async (rep: Representante) => {
@@ -690,9 +806,10 @@ export default function App() {
     });
 
     // Sincronizar cambio de estatus automáticamente en la misma base de datos de Google Sheets
-    if (linkedSheet) {
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet) {
       try {
-        await syncRepToSpreadsheet(linkedSheet.spreadsheetId, updatedRep, linkedSheet.sheetTabName);
+        await syncRepToSpreadsheet(activeSheet.spreadsheetId, updatedRep, activeSheet.sheetTabName);
         setSyncToast({
           type: newStatus === 'ACTIVO' ? 'success' : 'info',
           message: `"${rep.nombre}" ahora está ${newStatus} (sincronizado en Google Sheets).`,
@@ -730,8 +847,9 @@ export default function App() {
 
     // Cascade update to matching representatives if name changed
     let updatedRepsCount = 0;
+    let updatedRepsList: Representante[] = [];
     if (originalName && updateAssignedReps && originalName.toUpperCase() !== updatedGd.nombre.toUpperCase()) {
-      const updatedReps = repsData.map((rep) => {
+      updatedRepsList = repsData.map((rep) => {
         if (matchGerenteOrCoord(rep.gerenteDistrito, originalName)) {
           updatedRepsCount++;
           return { ...rep, gerenteDistrito: updatedGd.nombre };
@@ -739,9 +857,9 @@ export default function App() {
         return rep;
       });
       if (updatedRepsCount > 0) {
-        setRepsData(updatedReps);
+        setRepsData(updatedRepsList);
         try {
-          localStorage.setItem(STORAGE_REPS_KEY, JSON.stringify(updatedReps));
+          localStorage.setItem(STORAGE_REPS_KEY, JSON.stringify(updatedRepsList));
         } catch (e) {
           console.error('Error saving cascaded reps to localStorage:', e);
         }
@@ -756,6 +874,35 @@ export default function App() {
       return current;
     });
 
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet) {
+      try {
+        const gdRes = await syncGdToSpreadsheet(activeSheet.spreadsheetId, updatedGd);
+        if (updatedRepsCount > 0) {
+          // Sync cascaded reps to Google Sheets in background
+          for (const rep of updatedRepsList) {
+            if (matchGerenteOrCoord(rep.gerenteDistrito, updatedGd.nombre)) {
+              syncRepToSpreadsheet(activeSheet.spreadsheetId, rep, activeSheet.sheetTabName).catch(console.warn);
+            }
+          }
+        }
+        setSyncToast({
+          type: 'success',
+          message: gdRes.action === 'created'
+            ? `Líder "${updatedGd.nombre}" agregado al aplicativo y a Google Sheets.`
+            : `Líder "${updatedGd.nombre}" actualizado en el aplicativo y en Google Sheets.`,
+        });
+        return;
+      } catch (e: any) {
+        console.error('Error syncing GD to Google Sheets:', e);
+        setSyncToast({
+          type: 'error',
+          message: `Líder guardado localmente. Error en Google Sheets: ${e.message}`,
+        });
+        return;
+      }
+    }
+
     setSyncToast({
       type: 'success',
       message: updatedRepsCount > 0
@@ -764,7 +911,8 @@ export default function App() {
     });
   };
 
-  const handleDeleteGd = (gdId: string) => {
+  const handleDeleteGd = async (gdId: string) => {
+    const gdToDelete = gdsData.find((g) => g.id === gdId);
     const updated = gdsData.filter((g) => g.id !== gdId);
     setGdsData(updated);
     try {
@@ -778,13 +926,38 @@ export default function App() {
       }
       return current;
     });
+
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet && gdToDelete) {
+      try {
+        await deleteGdFromSpreadsheet(
+          activeSheet.spreadsheetId,
+          gdId,
+          gdToDelete.cedula,
+          gdToDelete.nombre
+        );
+        setSyncToast({
+          type: 'info',
+          message: `Líder "${gdToDelete.nombre}" eliminado del aplicativo y de Google Sheets.`,
+        });
+        return;
+      } catch (e: any) {
+        console.error('Error deleting GD from Google Sheets:', e);
+        setSyncToast({
+          type: 'error',
+          message: `Líder eliminado localmente. Error en Google Sheets: ${e.message}`,
+        });
+        return;
+      }
+    }
+
     setSyncToast({
       type: 'info',
       message: 'Líder eliminado correctamente.',
     });
   };
 
-  const handleToggleGdStatus = (gd: GerenteDistrito) => {
+  const handleToggleGdStatus = async (gd: GerenteDistrito) => {
     const isCurrentlyActive = (gd.status || 'ACTIVO').toUpperCase() === 'ACTIVO';
     const newStatus = isCurrentlyActive ? 'INACTIVO' : 'ACTIVO';
     const updatedGd: GerenteDistrito = { ...gd, status: newStatus };
@@ -797,6 +970,21 @@ export default function App() {
       }
       return updated;
     });
+
+    const activeSheet = await getActiveSpreadsheet();
+    if (activeSheet) {
+      try {
+        await syncGdToSpreadsheet(activeSheet.spreadsheetId, updatedGd);
+        setSyncToast({
+          type: newStatus === 'ACTIVO' ? 'success' : 'info',
+          message: `Líder "${gd.nombre}" ahora está ${newStatus} (sincronizado en Google Sheets).`,
+        });
+        return;
+      } catch (e: any) {
+        console.error('Error syncing GD status to Google Sheets:', e);
+      }
+    }
+
     setSyncToast({
       type: newStatus === 'ACTIVO' ? 'success' : 'info',
       message: `Líder "${gd.nombre}" ahora está ${newStatus === 'ACTIVO' ? 'ACTIVO' : 'INACTIVO'}.`,
