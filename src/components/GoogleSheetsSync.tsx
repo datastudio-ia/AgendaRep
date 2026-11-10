@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthUser, loginAsLocalSession } from '../services/firebaseAuth';
 import { Representante, GerenteDistrito, CredencialDrogueria, CustomDatabase } from '../types/contact';
 import {
@@ -88,6 +88,15 @@ export const GoogleSheetsSync: React.FC<GoogleSheetsSyncProps> = ({
   const [exportError, setExportError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  useEffect(() => {
+    if (!showConfirmModal) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [showConfirmModal]);
 
   // Link existing sheet state
   const [existingInput, setExistingInput] = useState('');
@@ -1237,8 +1246,14 @@ export const GoogleSheetsSync: React.FC<GoogleSheetsSyncProps> = ({
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl shadow-xl border border-[#EAE5E1] max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className="fixed inset-0 z-50 overflow-hidden overscroll-none flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+          onClick={() => setShowConfirmModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-xl border border-[#EAE5E1] max-w-md w-full p-6 overscroll-contain animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start gap-3.5">
               <div className="w-12 h-12 rounded-2xl bg-theme-10 text-theme-primary flex items-center justify-center shrink-0">
                 <FileSpreadsheet className="w-6 h-6" />

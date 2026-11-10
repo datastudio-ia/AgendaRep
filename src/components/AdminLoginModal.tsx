@@ -33,6 +33,21 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     }
   }, [isOpen]);
 
+  // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal está abierto
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -49,13 +64,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 overflow-hidden overscroll-none flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150"
+        className="bg-white rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-md overflow-hidden overscroll-contain animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

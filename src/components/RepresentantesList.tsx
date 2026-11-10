@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Representante, ViewMode, isRepComercial, isRepActive } from '../types/contact';
 import {
   Phone,
@@ -43,6 +43,15 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
   onToggleStatus,
 }) => {
   const [repToDelete, setRepToDelete] = useState<Representante | null>(null);
+
+  useEffect(() => {
+    if (!repToDelete) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [repToDelete]);
   if (reps.length === 0) {
     return (
       <div className="bg-white rounded-3xl border border-[#EAE5E1] p-12 text-center max-w-xl mx-auto my-8 shadow-xs">
@@ -491,11 +500,11 @@ export const RepresentantesList: React.FC<RepresentantesListProps> = ({
       {/* Confirmation Modal to safely delete representative */}
       {repToDelete && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 overflow-hidden overscroll-none flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => setRepToDelete(null)}
         >
           <div
-            className="bg-white rounded-3xl p-6 max-w-sm w-full border border-rose-100 shadow-2xl animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-3xl p-6 max-w-sm w-full border border-rose-100 shadow-2xl overscroll-contain animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3 border border-rose-100">

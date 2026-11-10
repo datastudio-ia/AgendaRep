@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ThemeId, APP_THEMES } from '../types/theme';
 import { Palette, Check, Sparkles, X, ArrowRight, ShieldCheck, HeartPulse, Building2 } from 'lucide-react';
 
@@ -15,12 +15,32 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   currentTheme,
   onSelectTheme,
 }) => {
+  // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal está abierto
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div
+      className="fixed inset-0 z-50 overflow-hidden overscroll-none flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
+        className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] overscroll-contain animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -48,7 +68,7 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
         </div>
 
         {/* Modal Body: The 3 Design Cards */}
-        <div className="p-6 overflow-y-auto space-y-5">
+        <div className="p-6 overflow-y-auto overscroll-contain space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {Object.values(APP_THEMES).map((theme) => {
               const isSelected = currentTheme === theme.id;

@@ -53,6 +53,16 @@ export const GerentesList: React.FC<GerentesListProps> = ({
   onDeleteGd,
 }) => {
   const [gdToDelete, setGdToDelete] = React.useState<GerenteDistrito | null>(null);
+
+  React.useEffect(() => {
+    if (!gdToDelete) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [gdToDelete]);
+
   const [internalRoleFilter, setInternalRoleFilter] = React.useState<'all' | 'gerentes' | 'coordinadores'>('all');
   const currentRole = onRoleFilterChange ? roleFilter : internalRoleFilter;
   const setRole = onRoleFilterChange || setInternalRoleFilter;
@@ -628,11 +638,11 @@ export const GerentesList: React.FC<GerentesListProps> = ({
       {/* Confirmation Modal to safely delete gerente/coordinador */}
       {gdToDelete && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 overflow-hidden overscroll-none flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => setGdToDelete(null)}
         >
           <div
-            className="bg-white rounded-3xl p-6 max-w-sm w-full border border-rose-100 shadow-2xl animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-3xl p-6 max-w-sm w-full border border-rose-100 shadow-2xl overscroll-contain animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3 border border-rose-100">

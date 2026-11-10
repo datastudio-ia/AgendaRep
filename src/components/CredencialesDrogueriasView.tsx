@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CredencialDrogueria, ViewMode } from '../types/contact';
 import {
   KeyRound,
@@ -104,6 +104,21 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   // Confirmation state for deleting a credencial
   const [credToDelete, setCredToDelete] = useState<CredencialDrogueria | null>(null);
+
+  // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal de confirmación está abierto
+  useEffect(() => {
+    if (!credToDelete) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [credToDelete]);
 
   const confirmDeleteCredencial = () => {
     if (credToDelete && onDeleteCredencial) {
@@ -750,8 +765,16 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
 
       {/* Confirmation Modal for Deletion */}
       {credToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div
+          className="fixed inset-0 z-50 overflow-hidden overscroll-none flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setCredToDelete(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 overscroll-contain animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600 border border-rose-200">
                 <AlertCircle className="w-6 h-6" />
