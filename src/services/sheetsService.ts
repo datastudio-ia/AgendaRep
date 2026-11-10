@@ -290,15 +290,29 @@ export async function fetchSpreadsheetPublicCsv(
 ): Promise<{ headers: string[]; rows: string[][] }> {
   const cleanId = extractSpreadsheetId(spreadsheetId) || spreadsheetId;
   const sheetParam = tabName ? `&sheet=${encodeURIComponent(tabName)}` : '';
-  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}`;
+  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&timestamp=${Date.now()}`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+    },
+  });
   if (!res.ok) {
     throw new Error(
       `No se pudo leer la hoja (${res.status}). Verifica que la hoja esté compartida como "Cualquiera con el enlace puede ver".`
     );
   }
   const text = await res.text();
+  if (
+    text.trim().startsWith('<!DOCTYPE') ||
+    text.trim().startsWith('<html') ||
+    text.includes('accounts.google.com') ||
+    text.includes('Sign in')
+  ) {
+    throw new Error('La hoja requiere inicio de sesión con Google o permisos públicos.');
+  }
   return parseCsvText(text);
 }
 
@@ -315,8 +329,13 @@ export async function getSpreadsheetDetails(
   // Try Google Sheets API v4 if token is present
   if (token && token !== 'local-token') {
     try {
-      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cleanId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cleanId}?timestamp=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
 
       if (res.ok) {
@@ -374,9 +393,14 @@ export async function fetchGenericSpreadsheet(
       const targetTab = tabName || 'Hoja 1';
       const range = `${encodeURIComponent(targetTab)}!A1:ZZ`;
       const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/${range}`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/${range}?timestamp=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
         }
       );
       if (res.ok) {
@@ -592,6 +616,8 @@ export interface PullSyncResult {
     unchanged: number;
     totalRemote: number;
   };
+  requiresAuth?: boolean;
+  message?: string;
 }
 
 /**
@@ -617,9 +643,14 @@ export async function pullRepsFromSpreadsheet(
 
       const range = `${encodeURIComponent(targetTab)}!A1:Z`;
       const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?timestamp=${Date.now()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
         }
       );
 
@@ -641,9 +672,13 @@ export async function pullRepsFromSpreadsheet(
       }
     } catch (publicErr) {
       if (!token || token === 'local-token') {
-        throw new Error(
-          'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.'
-        );
+        return {
+          updatedReps: localReps,
+          stats: { added: 0, updated: 0, unchanged: localReps.length, totalRemote: 0 },
+          requiresAuth: true,
+          message:
+            'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.',
+        };
       }
       throw publicErr;
     }
@@ -822,9 +857,14 @@ export async function syncRepToSpreadsheet(
   // 1. Read existing rows across all columns to find matches and inspect actual headers
   const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
   const readRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
     }
   );
 
@@ -979,9 +1019,14 @@ export async function getOrCreateCanonicalSpreadsheet(
   // 2. Search user's Drive for existing database file
   try {
     const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id, name)&pageSize=20`,
+      `https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id, name)&pageSize=20&timestamp=${Date.now()}`,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       }
     );
     if (searchRes.ok) {
@@ -1045,8 +1090,15 @@ export async function deleteRepFromSpreadsheet(
 
     const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
     const readRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+      {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      }
     );
     if (!readRes.ok) return false;
 
@@ -1077,8 +1129,13 @@ export async function deleteRepFromSpreadsheet(
     }
 
     if (targetRowIndex > 0) {
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
       if (metaRes.ok) {
         const metaData = await metaRes.json();
@@ -1127,8 +1184,13 @@ export async function ensureSheetTabExists(
   const token = await getAccessToken();
   if (!token) throw new Error('Token de Google no disponible.');
 
-  const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+    },
   });
 
   if (!metaRes.ok) {
@@ -1224,9 +1286,14 @@ export async function syncGdToSpreadsheet(
 
   const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
   const readRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
     }
   );
 
@@ -1342,8 +1409,15 @@ export async function deleteGdFromSpreadsheet(
     const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Gerentes de Distrito', CALOX_GD_HEADERS));
     const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
     const readRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+      {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      }
     );
     if (!readRes.ok) return false;
 
@@ -1374,12 +1448,16 @@ export async function deleteGdFromSpreadsheet(
     }
 
     if (targetRowIndex > 0) {
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
       if (metaRes.ok) {
-        const metaData = await metaRes.json();
-        const sheetObj = metaData.sheets?.find((s: any) => s.properties?.title === targetTab);
+        const sheetObj = (await metaRes.json()).sheets?.find((s: any) => s.properties?.title === targetTab);
         const numericSheetId = sheetObj?.properties?.sheetId || 0;
 
         const delRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, {
@@ -1428,9 +1506,14 @@ export async function syncCredencialToSpreadsheet(
 
   const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
   const readRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
     {
-      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
     }
   );
 
@@ -1544,8 +1627,15 @@ export async function deleteCredencialFromSpreadsheet(
     const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Credenciales Droguerías', CALOX_CREDENCIALES_HEADERS));
     const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
     const readRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+      {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      }
     );
     if (!readRes.ok) return false;
 
@@ -1574,8 +1664,13 @@ export async function deleteCredencialFromSpreadsheet(
     }
 
     if (targetRowIndex > 0) {
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
       });
       if (metaRes.ok) {
         const metaData = await metaRes.json();

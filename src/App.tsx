@@ -627,18 +627,18 @@ export default function App() {
     }
   };
 
-  // Pull sync: download latest additions & updates from Google Sheets into the app
-  // Pull sync: download latest additions & updates from Google Sheets into the app
-  const handlePullSync = async (silent: boolean = false, sheetOverride?: LinkedSpreadsheetInfo) => {
-    const targetSheet = sheetOverride || linkedSheet;
-    if (!targetSheet) {
-      if (!silent) setActiveTab('sheets');
-      return;
-    }
+  // Recarga en tiempo real de datos desde Google Sheets (fetchData)
+  const fetchData = async (sheetOverride?: LinkedSpreadsheetInfo) => {
+    const targetSheet = sheetOverride || linkedSheet || getLinkedSpreadsheetInfo();
+    if (!targetSheet || !targetSheet.spreadsheetId) return null;
     setIsPullSyncing(true);
     setSyncError(null);
     try {
       const result = await pullRepsFromSpreadsheet(targetSheet.spreadsheetId, repsData, targetSheet.sheetTabName);
+      if (result.requiresAuth) {
+        // La hoja requiere inicio de sesión con Google o permisos públicos; mantenemos los datos locales
+        return null;
+      }
       const sorted = sortRepsAlphabetically(normalizeRepUnits(result.updatedReps));
       setRepsData(sorted);
       try {
@@ -653,23 +653,28 @@ export default function App() {
       };
       setLinkedSheet(updatedInfo);
       setLinkedSpreadsheetInfo(updatedInfo);
-      if (!silent || (result.stats.added > 0 || result.stats.updated > 0)) {
-        setSyncToast({
-          type: 'success',
-          message: `Auto-sincronizado con Sheets: ${result.stats.added} agregados, ${result.stats.updated} actualizados.`,
-        });
-      }
+      return sorted;
     } catch (err: any) {
-      console.error('Error in auto pull sync:', err);
-      if (!silent) {
-        setSyncError(err.message || 'Error al sincronizar con Google Sheets');
-        setSyncToast({
-          type: 'error',
-          message: `Error al sincronizar: ${err.message || 'Verifica los permisos de la hoja'}`,
-        });
-      }
+      console.warn('Sincronización con Google Sheets pospuesta hasta autenticación:', err?.message || err);
+      return null;
     } finally {
       setIsPullSyncing(false);
+    }
+  };
+
+  // Pull sync: wrapper around fetchData for manual and scheduled syncs
+  const handlePullSync = async (silent: boolean = false, sheetOverride?: LinkedSpreadsheetInfo) => {
+    const targetSheet = sheetOverride || linkedSheet;
+    if (!targetSheet) {
+      if (!silent) setActiveTab('sheets');
+      return;
+    }
+    const sorted = await fetchData(targetSheet);
+    if (!silent && sorted) {
+      setSyncToast({
+        type: 'success',
+        message: 'Directorio sincronizado exitosamente con Google Sheets.',
+      });
     }
   };
 
@@ -717,6 +722,8 @@ export default function App() {
         };
         setLinkedSheet(updatedInfo);
         setLinkedSpreadsheetInfo(updatedInfo);
+        // Actualización de estado tras modificar: recarga automática desde Google Sheets
+        await fetchData(activeSheet);
         setSyncToast({
           type: 'success',
           message: syncRes.action === 'created'
@@ -770,6 +777,8 @@ export default function App() {
           repToDelete.nombre,
           activeSheet.sheetTabName
         );
+        // Actualización de estado tras modificar: recarga automática desde Google Sheets
+        await fetchData(activeSheet);
         setSyncToast({
           type: 'info',
           message: `"${repToDelete.nombre}" eliminado del aplicativo y de Google Sheets.`,
@@ -810,6 +819,8 @@ export default function App() {
     if (activeSheet) {
       try {
         await syncRepToSpreadsheet(activeSheet.spreadsheetId, updatedRep, activeSheet.sheetTabName);
+        // Actualización de estado tras modificar: recarga automática desde Google Sheets
+        await fetchData(activeSheet);
         setSyncToast({
           type: newStatus === 'ACTIVO' ? 'success' : 'info',
           message: `"${rep.nombre}" ahora está ${newStatus} (sincronizado en Google Sheets).`,
@@ -1092,6 +1103,14 @@ export default function App() {
       setIsAutoConnecting(false);
     }
   };
+
+  // Carga en tiempo real: consulta desde el cliente (client-side fetch) en el useEffect principal al cargar la pantalla
+  useEffect(() => {
+    const initialSheet = getLinkedSpreadsheetInfo();
+    if (initialSheet && initialSheet.spreadsheetId) {
+      fetchData(initialSheet);
+    }
+  }, []);
 
   // 1. Silent automatic sync on startup when user & linked sheet are detected
   useEffect(() => {
