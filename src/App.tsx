@@ -662,6 +662,11 @@ export default function App() {
     }
   };
 
+  // Carga de representantes en tiempo real (Re-fetch)
+  const cargarRepresentantes = async (sheetOverride?: LinkedSpreadsheetInfo) => {
+    return await fetchData(sheetOverride);
+  };
+
   // Pull sync: wrapper around fetchData for manual and scheduled syncs
   const handlePullSync = async (silent: boolean = false, sheetOverride?: LinkedSpreadsheetInfo) => {
     const targetSheet = sheetOverride || linkedSheet;
@@ -669,7 +674,7 @@ export default function App() {
       if (!silent) setActiveTab('sheets');
       return;
     }
-    const sorted = await fetchData(targetSheet);
+    const sorted = await cargarRepresentantes(targetSheet);
     if (!silent && sorted) {
       setSyncToast({
         type: 'success',
@@ -683,7 +688,7 @@ export default function App() {
       ...savedRep,
       unidadNegocio: getMappedUnit(savedRep.unidadNegocio),
     };
-    // 1. Guardar en el estado local de la aplicación
+    // 1. Guardar en el estado local de la aplicación (Actualización inmediata)
     setRepsData((prev) => {
       const index = prev.findIndex((r) => r.id === normalizedSavedRep.id);
       let updated: Representante[];
@@ -722,8 +727,10 @@ export default function App() {
         };
         setLinkedSheet(updatedInfo);
         setLinkedSpreadsheetInfo(updatedInfo);
-        // Actualización de estado tras modificar: recarga automática desde Google Sheets
-        await fetchData(activeSheet);
+
+        // Re-ejecución inmediata (Re-fetch): Inmediatamente después de recibir respuesta exitosa
+        await cargarRepresentantes(activeSheet);
+
         setSyncToast({
           type: 'success',
           message: syncRes.action === 'created'
@@ -777,8 +784,10 @@ export default function App() {
           repToDelete.nombre,
           activeSheet.sheetTabName
         );
-        // Actualización de estado tras modificar: recarga automática desde Google Sheets
-        await fetchData(activeSheet);
+
+        // Re-ejecución inmediata (Re-fetch): Inmediatamente después de recibir respuesta exitosa del DELETE
+        await cargarRepresentantes(activeSheet);
+
         setSyncToast({
           type: 'info',
           message: `"${repToDelete.nombre}" eliminado del aplicativo y de Google Sheets.`,
@@ -819,8 +828,8 @@ export default function App() {
     if (activeSheet) {
       try {
         await syncRepToSpreadsheet(activeSheet.spreadsheetId, updatedRep, activeSheet.sheetTabName);
-        // Actualización de estado tras modificar: recarga automática desde Google Sheets
-        await fetchData(activeSheet);
+        // Re-ejecución inmediata (Re-fetch)
+        await cargarRepresentantes(activeSheet);
         setSyncToast({
           type: newStatus === 'ACTIVO' ? 'success' : 'info',
           message: `"${rep.nombre}" ahora está ${newStatus} (sincronizado en Google Sheets).`,
@@ -835,6 +844,19 @@ export default function App() {
       type: newStatus === 'ACTIVO' ? 'success' : 'info',
       message: `Representante "${rep.nombre}" ahora está ${newStatus === 'ACTIVO' ? 'ACTIVO' : 'INACTIVO'}.`,
     });
+  };
+
+  // Funciones específicas para manipulación de representantes
+  const agregarRepresentante = async (nuevoRep: Representante) => {
+    return await handleSaveRep(nuevoRep, true);
+  };
+
+  const editarRepresentante = async (repEditado: Representante) => {
+    return await handleSaveRep(repEditado, true);
+  };
+
+  const eliminarRepresentante = async (repId: string) => {
+    return await handleDeleteRep(repId);
   };
 
   const handleSaveGd = async (

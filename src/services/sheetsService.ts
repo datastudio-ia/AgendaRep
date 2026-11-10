@@ -21,6 +21,23 @@ export const CANONICAL_DATABASE_TITLE = 'Agenda de Representantes Calox - Base d
 export const CANONICAL_SHEET_KEY = 'calox_canonical_linked_sheet_v1';
 const LINKED_SHEET_KEY = 'calox_linked_sheet_v1';
 
+export const GOOGLE_SHEETS_SCRIPT_URL =
+  (typeof import.meta !== 'undefined' &&
+    import.meta.env &&
+    (import.meta.env.VITE_GOOGLE_SHEETS_SCRIPT_URL || import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL)) ||
+  (typeof localStorage !== 'undefined' ? localStorage.getItem('calox_google_sheets_script_url') || '' : '') ||
+  '';
+
+export const setGoogleSheetsScriptUrl = (url: string): void => {
+  if (typeof localStorage !== 'undefined') {
+    if (url) {
+      localStorage.setItem('calox_google_sheets_script_url', url);
+    } else {
+      localStorage.removeItem('calox_google_sheets_script_url');
+    }
+  }
+};
+
 export const getLinkedSpreadsheetInfo = (): LinkedSpreadsheetInfo | null => {
   try {
     const canonicalRaw = localStorage.getItem(CANONICAL_SHEET_KEY);
@@ -290,13 +307,14 @@ export async function fetchSpreadsheetPublicCsv(
 ): Promise<{ headers: string[]; rows: string[][] }> {
   const cleanId = extractSpreadsheetId(spreadsheetId) || spreadsheetId;
   const sheetParam = tabName ? `&sheet=${encodeURIComponent(tabName)}` : '';
-  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&timestamp=${Date.now()}`;
+  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&t=${new Date().getTime()}`;
 
   const res = await fetch(url, {
+    method: 'GET',
     cache: 'no-store',
     headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
+      'Pragma': 'no-cache',
+      'Cache-Control': 'no-cache',
     },
   });
   if (!res.ok) {
@@ -643,13 +661,14 @@ export async function pullRepsFromSpreadsheet(
 
       const range = `${encodeURIComponent(targetTab)}!A1:Z`;
       const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?timestamp=${Date.now()}`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?t=${new Date().getTime()}`,
         {
+          method: 'GET',
           cache: 'no-store',
           headers: {
             Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache',
           },
         }
       );
@@ -663,24 +682,62 @@ export async function pullRepsFromSpreadsheet(
     }
   }
 
-  // Fallback to public CSV export
+  // Fallback to Google Apps Script or public CSV export
   if (rows.length === 0) {
-    try {
-      const publicData = await fetchSpreadsheetPublicCsv(spreadsheetId, targetTab);
-      if (publicData.headers.length > 0) {
-        rows = [publicData.headers, ...publicData.rows];
+    const scriptEndpoint =
+      (spreadsheetId.includes('script.google.com') ? spreadsheetId : '') ||
+      GOOGLE_SHEETS_SCRIPT_URL;
+
+    if (scriptEndpoint) {
+      try {
+        const glue = scriptEndpoint.includes('?') ? '&' : '?';
+        const scriptUrl = `${scriptEndpoint}${glue}t=${new Date().getTime()}`;
+        const scriptRes = await fetch(scriptUrl, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Pragma': 'no-cache',
+            'Cache-Control': 'no-cache',
+          },
+        });
+        if (scriptRes.ok) {
+          const text = await scriptRes.text();
+          try {
+            const json = JSON.parse(text);
+            const raw = json.values || json.data || json.rows || (Array.isArray(json) ? json : null);
+            if (Array.isArray(raw) && raw.length > 0) {
+              rows = raw;
+            }
+          } catch {
+            const parsed = parseCsvText(text);
+            if (parsed.headers.length > 0) {
+              rows = [parsed.headers, ...parsed.rows];
+            }
+          }
+        }
+      } catch (scriptErr) {
+        console.warn('Apps Script fetch failed:', scriptErr);
       }
-    } catch (publicErr) {
-      if (!token || token === 'local-token') {
-        return {
-          updatedReps: localReps,
-          stats: { added: 0, updated: 0, unchanged: localReps.length, totalRemote: 0 },
-          requiresAuth: true,
-          message:
-            'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.',
-        };
+    }
+
+    if (rows.length === 0) {
+      try {
+        const publicData = await fetchSpreadsheetPublicCsv(spreadsheetId, targetTab);
+        if (publicData.headers.length > 0) {
+          rows = [publicData.headers, ...publicData.rows];
+        }
+      } catch (publicErr) {
+        if (!token || token === 'local-token') {
+          return {
+            updatedReps: localReps,
+            stats: { added: 0, updated: 0, unchanged: localReps.length, totalRemote: 0 },
+            requiresAuth: true,
+            message:
+              'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.',
+          };
+        }
+        throw publicErr;
       }
-      throw publicErr;
     }
   }
 
@@ -699,8 +756,9 @@ export async function pullRepsFromSpreadsheet(
   let updatedCount = 0;
   let unchangedCount = 0;
 
-  // Work on a mutable copy of local representatives
-  const mergedReps = [...localReps];
+  // Build the authoritative representative list directly from the remote spreadsheet rows
+  // This ensures deletions and edits made in Google Sheets / Apps Script are reflected immediately
+  const freshReps: Representante[] = [];
 
   dataRows.forEach((row, rowIdx) => {
     const getVal = (colKey: string): string => {
@@ -740,54 +798,51 @@ export async function pullRepsFromSpreadsheet(
       tipoRepresentante: isCom ? 'Comercial' : 'Visita Médica',
     };
 
-    // Match with local rep: first by cedula (if not empty), then by nombre
-    let matchIndex = -1;
-    if (cedula) {
-      matchIndex = mergedReps.findIndex(
-        r => r.cedula && r.cedula.replace(/\D/g, '') === cedula.replace(/\D/g, '')
-      );
-    }
-    if (matchIndex === -1 && nombre) {
-      matchIndex = mergedReps.findIndex(
-        r => r.nombre.trim().toUpperCase() === nombre.trim().toUpperCase()
-      );
-    }
+    // Match with existing local rep to preserve stable IDs across updates
+    const cleanCedula = cedula ? cedula.replace(/\D/g, '') : '';
+    const cleanNombre = nombre ? nombre.trim().toUpperCase() : '';
 
-    if (matchIndex >= 0) {
-      // Representative exists: check if any fields differ
-      const current = mergedReps[matchIndex];
+    const existing = localReps.find(r => {
+      const rCedula = r.cedula ? r.cedula.replace(/\D/g, '') : '';
+      const rNombre = r.nombre ? r.nombre.trim().toUpperCase() : '';
+      return (cleanCedula && rCedula && cleanCedula === rCedula) ||
+             (cleanNombre && rNombre && cleanNombre === rNombre);
+    });
+
+    if (existing) {
       const hasChanges =
-        (repFromSheet.nombre && repFromSheet.nombre !== current.nombre) ||
-        (repFromSheet.cedula && repFromSheet.cedula !== current.cedula) ||
-        (repFromSheet.status && repFromSheet.status !== current.status) ||
-        (repFromSheet.ciudad && repFromSheet.ciudad !== current.ciudad) ||
-        (repFromSheet.estado && repFromSheet.estado !== current.estado) ||
-        (repFromSheet.region && repFromSheet.region !== current.region) ||
-        (repFromSheet.unidadNegocio && repFromSheet.unidadNegocio !== current.unidadNegocio) ||
-        (repFromSheet.codigoSector && repFromSheet.codigoSector !== current.codigoSector) ||
-        (repFromSheet.gerenteDistrito && repFromSheet.gerenteDistrito !== current.gerenteDistrito) ||
-        (repFromSheet.telefono && repFromSheet.telefono !== current.telefono) ||
-        (repFromSheet.correo && repFromSheet.correo !== current.correo);
+        (repFromSheet.nombre && repFromSheet.nombre !== existing.nombre) ||
+        (repFromSheet.cedula && repFromSheet.cedula !== existing.cedula) ||
+        (repFromSheet.status && repFromSheet.status !== existing.status) ||
+        (repFromSheet.ciudad && repFromSheet.ciudad !== existing.ciudad) ||
+        (repFromSheet.estado && repFromSheet.estado !== existing.estado) ||
+        (repFromSheet.region && repFromSheet.region !== existing.region) ||
+        (repFromSheet.unidadNegocio && repFromSheet.unidadNegocio !== existing.unidadNegocio) ||
+        (repFromSheet.codigoSector && repFromSheet.codigoSector !== existing.codigoSector) ||
+        (repFromSheet.gerenteDistrito && repFromSheet.gerenteDistrito !== existing.gerenteDistrito) ||
+        (repFromSheet.telefono && repFromSheet.telefono !== existing.telefono) ||
+        (repFromSheet.correo && repFromSheet.correo !== existing.correo);
+
+      freshReps.push({
+        ...existing,
+        ...repFromSheet,
+        tipoRepresentante:
+          repFromSheet.unidadNegocio?.toUpperCase().includes('COMERCIAL')
+            ? 'Comercial'
+            : 'Visita Médica',
+      } as Representante);
 
       if (hasChanges) {
-        mergedReps[matchIndex] = {
-          ...current,
-          ...repFromSheet,
-          tipoRepresentante:
-            repFromSheet.unidadNegocio?.toUpperCase().includes('COMERCIAL')
-              ? 'Comercial'
-              : 'Visita Médica',
-        } as Representante;
         updatedCount++;
       } else {
         unchangedCount++;
       }
     } else {
-      // New representative added directly into Google Sheets!
+      // New row added in Google Sheets
       const newRep: Representante = {
         id: `sheet-rep-${Date.now()}-${rowIdx}`,
         status: repFromSheet.status || 'ACTIVO',
-        num: repFromSheet.num || String(mergedReps.length + 1),
+        num: repFromSheet.num || String(freshReps.length + 1),
         cedula: repFromSheet.cedula || '',
         nombre: repFromSheet.nombre || 'REPRESENTANTE NUEVO',
         ciudad: repFromSheet.ciudad || '',
@@ -805,7 +860,7 @@ export async function pullRepsFromSpreadsheet(
             ? 'Comercial'
             : 'Visita Médica',
       };
-      mergedReps.push(newRep);
+      freshReps.push(newRep);
       addedCount++;
     }
   });
@@ -820,7 +875,7 @@ export async function pullRepsFromSpreadsheet(
   }
 
   return {
-    updatedReps: mergedReps,
+    updatedReps: freshReps,
     stats: {
       added: addedCount,
       updated: updatedCount,
