@@ -644,14 +644,35 @@ export default function App() {
     }
   };
 
-  // Recarga en tiempo real de datos desde Google Sheets (fetchData)
-  const fetchData = async (sheetOverride?: LinkedSpreadsheetInfo) => {
-    const targetSheet = sheetOverride || linkedSheet || getLinkedSpreadsheetInfo();
+  // Recarga en tiempo real de datos desde Google Sheets (fetchData) sin caché
+  const fetchData = async (
+    sheetOverride?: LinkedSpreadsheetInfo,
+    currentRepsOverride?: Representante[]
+  ) => {
+    const scriptUrl = getGoogleSheetsScriptUrl();
+    const targetSheet =
+      sheetOverride ||
+      linkedSheet ||
+      getLinkedSpreadsheetInfo() ||
+      (scriptUrl
+        ? {
+            spreadsheetId: scriptUrl,
+            spreadsheetUrl: scriptUrl,
+            title: CANONICAL_DATABASE_TITLE,
+            sheetTabName: 'Representantes',
+          }
+        : null);
+
     if (!targetSheet || !targetSheet.spreadsheetId) return null;
     setIsPullSyncing(true);
     setSyncError(null);
     try {
-      const result = await pullRepsFromSpreadsheet(targetSheet.spreadsheetId, repsData, targetSheet.sheetTabName);
+      const baseReps = currentRepsOverride || repsData;
+      const result = await pullRepsFromSpreadsheet(
+        targetSheet.spreadsheetId,
+        baseReps,
+        targetSheet.sheetTabName
+      );
       if (result.requiresAuth) {
         // La hoja requiere inicio de sesión con Google o permisos públicos; mantenemos los datos locales
         return null;
@@ -679,14 +700,17 @@ export default function App() {
     }
   };
 
-  // Carga de representantes en tiempo real (Re-fetch)
-  const cargarRepresentantes = async (sheetOverride?: LinkedSpreadsheetInfo) => {
-    return await fetchData(sheetOverride);
+  // Carga de representantes en tiempo real (Re-fetch desde Google Sheets)
+  const cargarRepresentantes = async (
+    sheetOverride?: LinkedSpreadsheetInfo,
+    currentRepsOverride?: Representante[]
+  ) => {
+    return await fetchData(sheetOverride, currentRepsOverride);
   };
 
   // Pull sync: wrapper around fetchData for manual and scheduled syncs
   const handlePullSync = async (silent: boolean = false, sheetOverride?: LinkedSpreadsheetInfo) => {
-    const targetSheet = sheetOverride || linkedSheet;
+    const targetSheet = sheetOverride || linkedSheet || (await getActiveSpreadsheet());
     if (!targetSheet) {
       if (!silent) setActiveTab('sheets');
       return;
@@ -700,24 +724,22 @@ export default function App() {
     }
   };
 
-  const applyLocalRepUpdate = (normalizedSavedRep: Representante) => {
-    setRepsData((prev) => {
-      const index = prev.findIndex((r) => r.id === normalizedSavedRep.id);
-      let updated: Representante[];
-      if (index >= 0) {
-        updated = [...prev];
-        updated[index] = normalizedSavedRep;
-      } else {
-        updated = [normalizedSavedRep, ...prev];
-      }
-      const sorted = sortRepsAlphabetically(updated);
-      try {
-        localStorage.setItem(STORAGE_REPS_KEY, JSON.stringify(sorted));
-      } catch (e) {
-        console.error('Error saving to localStorage:', e);
-      }
-      return sorted;
-    });
+  const applyLocalRepUpdate = (normalizedSavedRep: Representante): Representante[] => {
+    const index = repsData.findIndex((r) => r.id === normalizedSavedRep.id);
+    let updated: Representante[];
+    if (index >= 0) {
+      updated = [...repsData];
+      updated[index] = normalizedSavedRep;
+    } else {
+      updated = [normalizedSavedRep, ...repsData];
+    }
+    const sorted = sortRepsAlphabetically(updated);
+    setRepsData(sorted);
+    try {
+      localStorage.setItem(STORAGE_REPS_KEY, JSON.stringify(sorted));
+    } catch (e) {
+      console.error('Error saving to localStorage:', e);
+    }
 
     setSelectedContact((current) => {
       if (current && (current as Representante).id === normalizedSavedRep.id) {
@@ -725,6 +747,8 @@ export default function App() {
       }
       return current;
     });
+
+    return sorted;
   };
 
   const handleSaveRep = async (
@@ -763,26 +787,27 @@ export default function App() {
           isEdit
         );
 
-        // Actualizar estado local después de confirmar que Google Sheets guardó el cambio correctamente
-        applyLocalRepUpdate(normalizedSavedRep);
+        // 1. Actualizar estado local inmediatamente después de confirmar que Google Sheets guardó el cambio
+        const updatedLocalReps = applyLocalRepUpdate(normalizedSavedRep);
 
-        if (activeSheet) {
-          const updatedInfo: LinkedSpreadsheetInfo = {
-            ...activeSheet,
-            lastSyncedAt: new Date().toISOString(),
-          };
-          setLinkedSheet(updatedInfo);
-          setLinkedSpreadsheetInfo(updatedInfo);
-          // Forzar re-sincronización desde Google Sheets tras confirmar el guardado
-          await cargarRepresentantes(updatedInfo);
-        }
+        // 2. Ejecutar inmediatamente la función que lee los datos frescos desde Google Sheets (sin caché)
+        const updatedInfo: LinkedSpreadsheetInfo = {
+          spreadsheetId: targetSpreadsheetId,
+          spreadsheetUrl: activeSheet?.spreadsheetUrl || targetSpreadsheetId,
+          title: activeSheet?.title || CANONICAL_DATABASE_TITLE,
+          sheetTabName: targetTabName,
+          lastSyncedAt: new Date().toISOString(),
+        };
+        setLinkedSheet(updatedInfo);
+        setLinkedSpreadsheetInfo(updatedInfo);
+        await cargarRepresentantes(updatedInfo, updatedLocalReps);
 
         setSyncToast({
           type: 'success',
           message:
             syncRes.action === 'created'
               ? `"${savedRep.nombre}" registrado y sincronizado en Google Sheets (fila ${syncRes.rowNumber}).`
-              : `"${savedRep.nombre}" actualizado y guardado en Google Sheets (fila ${syncRes.rowNumber}).`,
+              : `"${savedRep.nombre}" actualizado y recargado desde Google Sheets (fila ${syncRes.rowNumber}).`,
         });
       } catch (err: any) {
         console.error('Error syncing representative to Google Sheets:', err);
@@ -795,14 +820,18 @@ export default function App() {
         setIsSavingToSheets(false);
       }
     } else {
-      // Modo local / hoja pública sin Web App configurado aún: persistir mutación localmente para que no se pierda al recargar
+      // Modo local / hoja pública: persistir mutación y volver a ejecutar lectura fresca si hay hoja vinculada
       saveLocalRepMutation(normalizedSavedRep, isEdit ? 'update' : 'create', existingRep, false);
-      applyLocalRepUpdate(normalizedSavedRep);
+      const updatedLocalReps = applyLocalRepUpdate(normalizedSavedRep);
+
+      if (activeSheet) {
+        await cargarRepresentantes(activeSheet, updatedLocalReps);
+      }
 
       setSyncToast({
         type: 'info',
         message: activeSheet
-          ? `"${savedRep.nombre}" actualizado y persistido en el navegador. Para escritura automática en tu hoja sin OAuth, vincula la URL de tu Google Apps Script en la pestaña "Google Sheets".`
+          ? `"${savedRep.nombre}" actualizado y sincronizado. Para escritura directa sin OAuth, vincula tu URL de Google Apps Script en la pestaña "Google Sheets".`
           : `"${savedRep.nombre}" guardado y persistido localmente con éxito.`,
       });
     }
@@ -1183,8 +1212,16 @@ export default function App() {
   // Carga en tiempo real: consulta desde el cliente (client-side fetch) en el useEffect principal al cargar la pantalla
   useEffect(() => {
     const initialSheet = getLinkedSpreadsheetInfo();
+    const scriptUrl = getGoogleSheetsScriptUrl();
     if (initialSheet && initialSheet.spreadsheetId) {
       fetchData(initialSheet);
+    } else if (scriptUrl) {
+      fetchData({
+        spreadsheetId: scriptUrl,
+        spreadsheetUrl: scriptUrl,
+        title: CANONICAL_DATABASE_TITLE,
+        sheetTabName: 'Representantes',
+      });
     }
   }, []);
 

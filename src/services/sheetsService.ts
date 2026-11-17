@@ -362,15 +362,11 @@ export async function fetchSpreadsheetPublicCsv(
 ): Promise<{ headers: string[]; rows: string[][] }> {
   const cleanId = extractSpreadsheetId(spreadsheetId) || spreadsheetId;
   const sheetParam = tabName ? `&sheet=${encodeURIComponent(tabName)}` : '';
-  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&t=${new Date().getTime()}`;
+  const url = `https://docs.google.com/spreadsheets/d/${cleanId}/gviz/tq?tqx=out:csv${sheetParam}&t=${Date.now()}`;
 
   const res = await fetch(url, {
     method: 'GET',
     cache: 'no-store',
-    headers: {
-      'Pragma': 'no-cache',
-      'Cache-Control': 'no-cache',
-    },
   });
   if (!res.ok) {
     throw new Error(
@@ -703,7 +699,43 @@ export async function pullRepsFromSpreadsheet(
   let rows: string[][] = [];
   let targetTab = tabName;
 
-  if (token && token !== 'local-token') {
+  const scriptEndpoint =
+    (spreadsheetId.includes('script.google.com') ? spreadsheetId : '') ||
+    getGoogleSheetsScriptUrl();
+
+  // 1. If a Google Apps Script endpoint is configured, read fresh un-cached data via GET with ?t=${Date.now()} and cache: 'no-store'
+  if (scriptEndpoint) {
+    try {
+      const glue = scriptEndpoint.includes('?') ? '&' : '?';
+      const tabParam = targetTab ? `&sheetName=${encodeURIComponent(targetTab)}` : '';
+      const scriptUrl = `${scriptEndpoint}${glue}t=${Date.now()}${tabParam}`;
+      const scriptRes = await fetch(scriptUrl, {
+        method: 'GET',
+        cache: 'no-store',
+        redirect: 'follow',
+      });
+      if (scriptRes.ok) {
+        const text = await scriptRes.text();
+        try {
+          const json = JSON.parse(text);
+          const raw = json.values || json.data || json.rows || (Array.isArray(json) ? json : null);
+          if (Array.isArray(raw) && raw.length > 0) {
+            rows = raw;
+          }
+        } catch {
+          const parsed = parseCsvText(text);
+          if (parsed.headers.length > 0) {
+            rows = [parsed.headers, ...parsed.rows];
+          }
+        }
+      }
+    } catch (scriptErr) {
+      console.warn('Apps Script GET fetch failed, trying next source:', scriptErr);
+    }
+  }
+
+  // 2. If not loaded yet and OAuth token is present, read from Google Sheets API v4 with cache: 'no-store'
+  if (rows.length === 0 && token && token !== 'local-token' && !spreadsheetId.includes('script.google.com')) {
     try {
       if (!targetTab) {
         const details = await getSpreadsheetDetails(spreadsheetId);
@@ -731,59 +763,24 @@ export async function pullRepsFromSpreadsheet(
     }
   }
 
-  // Fallback to Google Apps Script or public CSV export
-  if (rows.length === 0) {
-    const scriptEndpoint =
-      (spreadsheetId.includes('script.google.com') ? spreadsheetId : '') ||
-      getGoogleSheetsScriptUrl();
-
-    if (scriptEndpoint) {
-      try {
-        const glue = scriptEndpoint.includes('?') ? '&' : '?';
-        const scriptUrl = `${scriptEndpoint}${glue}t=${new Date().getTime()}`;
-        const scriptRes = await fetch(scriptUrl, {
-          method: 'GET',
-          cache: 'no-store',
-          redirect: 'follow',
-        });
-        if (scriptRes.ok) {
-          const text = await scriptRes.text();
-          try {
-            const json = JSON.parse(text);
-            const raw = json.values || json.data || json.rows || (Array.isArray(json) ? json : null);
-            if (Array.isArray(raw) && raw.length > 0) {
-              rows = raw;
-            }
-          } catch {
-            const parsed = parseCsvText(text);
-            if (parsed.headers.length > 0) {
-              rows = [parsed.headers, ...parsed.rows];
-            }
-          }
-        }
-      } catch (scriptErr) {
-        console.warn('Apps Script fetch failed:', scriptErr);
+  // 3. Fallback to public CSV export with &t=${Date.now()} and cache: 'no-store'
+  if (rows.length === 0 && !spreadsheetId.includes('script.google.com')) {
+    try {
+      const publicData = await fetchSpreadsheetPublicCsv(spreadsheetId, targetTab);
+      if (publicData.headers.length > 0) {
+        rows = [publicData.headers, ...publicData.rows];
       }
-    }
-
-    if (rows.length === 0) {
-      try {
-        const publicData = await fetchSpreadsheetPublicCsv(spreadsheetId, targetTab);
-        if (publicData.headers.length > 0) {
-          rows = [publicData.headers, ...publicData.rows];
-        }
-      } catch (publicErr) {
-        if (!token || token === 'local-token') {
-          return {
-            updatedReps: localReps,
-            stats: { added: 0, updated: 0, unchanged: localReps.length, totalRemote: 0 },
-            requiresAuth: true,
-            message:
-              'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.',
-          };
-        }
-        throw publicErr;
+    } catch (publicErr) {
+      if (!token || token === 'local-token') {
+        return {
+          updatedReps: localReps,
+          stats: { added: 0, updated: 0, unchanged: localReps.length, totalRemote: 0 },
+          requiresAuth: true,
+          message:
+            'Para sincronizar esta hoja: asegúrate de que esté compartida en Google Sheets como "Cualquiera con el enlace puede ver", o conecta tu cuenta de Google.',
+        };
       }
+      throw publicErr;
     }
   }
 
