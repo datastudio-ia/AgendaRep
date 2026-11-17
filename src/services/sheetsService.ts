@@ -21,20 +21,75 @@ export const CANONICAL_DATABASE_TITLE = 'Agenda de Representantes Calox - Base d
 export const CANONICAL_SHEET_KEY = 'calox_canonical_linked_sheet_v1';
 const LINKED_SHEET_KEY = 'calox_linked_sheet_v1';
 
-export const GOOGLE_SHEETS_SCRIPT_URL =
-  (typeof import.meta !== 'undefined' &&
-    import.meta.env &&
-    (import.meta.env.VITE_GOOGLE_SHEETS_SCRIPT_URL || import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL)) ||
-  (typeof localStorage !== 'undefined' ? localStorage.getItem('calox_google_sheets_script_url') || '' : '') ||
-  '';
+export const getGoogleSheetsScriptUrl = (): string => {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('calox_google_sheets_script_url');
+    if (saved && saved.trim()) return saved.trim();
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    const envUrl = import.meta.env.VITE_GOOGLE_SHEETS_SCRIPT_URL || import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL;
+    if (envUrl && String(envUrl).trim()) return String(envUrl).trim();
+  }
+  return '';
+};
+
+export const GOOGLE_SHEETS_SCRIPT_URL = getGoogleSheetsScriptUrl();
 
 export const setGoogleSheetsScriptUrl = (url: string): void => {
   if (typeof localStorage !== 'undefined') {
-    if (url) {
-      localStorage.setItem('calox_google_sheets_script_url', url);
+    if (url && url.trim()) {
+      localStorage.setItem('calox_google_sheets_script_url', url.trim());
     } else {
       localStorage.removeItem('calox_google_sheets_script_url');
     }
+  }
+};
+
+const LOCAL_REP_MUTATIONS_KEY = 'calox_local_rep_mutations_v1';
+
+export interface LocalRepMutation {
+  rep: Representante;
+  originalCedula?: string;
+  originalNombre?: string;
+  action: 'update' | 'create' | 'delete';
+  updatedAt: number;
+  syncedRemotely: boolean;
+}
+
+export const getLocalRepMutations = (): Record<string, LocalRepMutation> => {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    const raw = localStorage.getItem(LOCAL_REP_MUTATIONS_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) || {};
+  } catch (e) {
+    console.warn('Error reading local rep mutations:', e);
+    return {};
+  }
+};
+
+export const saveLocalRepMutation = (
+  rep: Representante,
+  action: 'update' | 'create' | 'delete',
+  originalRep?: Representante,
+  syncedRemotely: boolean = false
+): void => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const current = getLocalRepMutations();
+    const key = rep.id || rep.cedula?.replace(/\D/g, '') || rep.nombre?.trim().toUpperCase();
+    if (!key) return;
+    current[key] = {
+      rep,
+      originalCedula: originalRep?.cedula || rep.cedula,
+      originalNombre: originalRep?.nombre || rep.nombre,
+      action,
+      updatedAt: Date.now(),
+      syncedRemotely,
+    };
+    localStorage.setItem(LOCAL_REP_MUTATIONS_KEY, JSON.stringify(current));
+  } catch (e) {
+    console.warn('Error saving local rep mutation:', e);
   }
 };
 
@@ -347,12 +402,10 @@ export async function getSpreadsheetDetails(
   // Try Google Sheets API v4 if token is present
   if (token && token !== 'local-token') {
     try {
-      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cleanId}?timestamp=${Date.now()}`, {
+      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cleanId}`, {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       });
 
@@ -411,13 +464,11 @@ export async function fetchGenericSpreadsheet(
       const targetTab = tabName || 'Hoja 1';
       const range = `${encodeURIComponent(targetTab)}!A1:ZZ`;
       const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/${range}?timestamp=${Date.now()}`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${cleanId}/values/${range}`,
         {
           cache: 'no-store',
           headers: {
             Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
           },
         }
       );
@@ -661,14 +712,12 @@ export async function pullRepsFromSpreadsheet(
 
       const range = `${encodeURIComponent(targetTab)}!A1:Z`;
       const res = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}?t=${new Date().getTime()}`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`,
         {
           method: 'GET',
           cache: 'no-store',
           headers: {
             Authorization: `Bearer ${token}`,
-            'Pragma': 'no-cache',
-            'Cache-Control': 'no-cache',
           },
         }
       );
@@ -686,7 +735,7 @@ export async function pullRepsFromSpreadsheet(
   if (rows.length === 0) {
     const scriptEndpoint =
       (spreadsheetId.includes('script.google.com') ? spreadsheetId : '') ||
-      GOOGLE_SHEETS_SCRIPT_URL;
+      getGoogleSheetsScriptUrl();
 
     if (scriptEndpoint) {
       try {
@@ -695,10 +744,7 @@ export async function pullRepsFromSpreadsheet(
         const scriptRes = await fetch(scriptUrl, {
           method: 'GET',
           cache: 'no-store',
-          headers: {
-            'Pragma': 'no-cache',
-            'Cache-Control': 'no-cache',
-          },
+          redirect: 'follow',
         });
         if (scriptRes.ok) {
           const text = await scriptRes.text();
@@ -756,9 +802,12 @@ export async function pullRepsFromSpreadsheet(
   let updatedCount = 0;
   let unchangedCount = 0;
 
-  // Build the authoritative representative list directly from the remote spreadsheet rows
-  // This ensures deletions and edits made in Google Sheets / Apps Script are reflected immediately
+  const mutations = getLocalRepMutations();
+  const mutationList = Object.values(mutations);
+
+  // Build the authoritative representative list from remote spreadsheet rows + verified local mutations
   const freshReps: Representante[] = [];
+  const matchedMutationIds = new Set<string>();
 
   dataRows.forEach((row, rowIdx) => {
     const getVal = (colKey: string): string => {
@@ -771,6 +820,29 @@ export async function pullRepsFromSpreadsheet(
 
     // Skip empty ghost rows
     if (!nombre && !cedula) return;
+
+    const cleanCedula = cedula ? cedula.replace(/\D/g, '') : '';
+    const cleanNombre = nombre ? nombre.trim().toUpperCase() : '';
+
+    // Check if this row was deleted locally or modified by a recent mutation
+    const matchingMutation = mutationList.find(m => {
+      const mOrigCed = (m.originalCedula || '').replace(/\D/g, '');
+      const mNewCed = (m.rep.cedula || '').replace(/\D/g, '');
+      const mOrigNom = (m.originalNombre || '').trim().toUpperCase();
+      const mNewNom = (m.rep.nombre || '').trim().toUpperCase();
+
+      return (
+        (cleanCedula && (cleanCedula === mOrigCed || cleanCedula === mNewCed)) ||
+        (cleanNombre && (cleanNombre === mOrigNom || cleanNombre === mNewNom))
+      );
+    });
+
+    if (matchingMutation) {
+      matchedMutationIds.add(matchingMutation.rep.id);
+      if (matchingMutation.action === 'delete') {
+        return; // Skip deleted row
+      }
+    }
 
     const rawSheetUnit = getVal('unidadNegocio');
     const normalizedSheetUnit = getMappedUnit(rawSheetUnit);
@@ -799,15 +871,39 @@ export async function pullRepsFromSpreadsheet(
     };
 
     // Match with existing local rep to preserve stable IDs across updates
-    const cleanCedula = cedula ? cedula.replace(/\D/g, '') : '';
-    const cleanNombre = nombre ? nombre.trim().toUpperCase() : '';
-
     const existing = localReps.find(r => {
       const rCedula = r.cedula ? r.cedula.replace(/\D/g, '') : '';
       const rNombre = r.nombre ? r.nombre.trim().toUpperCase() : '';
-      return (cleanCedula && rCedula && cleanCedula === rCedula) ||
-             (cleanNombre && rNombre && cleanNombre === rNombre);
+      return (
+        (matchingMutation && r.id === matchingMutation.rep.id) ||
+        (cleanCedula && rCedula && cleanCedula === rCedula) ||
+        (cleanNombre && rNombre && cleanNombre === rNombre)
+      );
     });
+
+    // If there is a local mutation and the public CSV cache hasn't reflected it yet, preserve the mutated fields
+    if (matchingMutation && (matchingMutation.action === 'update' || matchingMutation.action === 'create')) {
+      const sheetReflectsMutation =
+        cleanNombre === (matchingMutation.rep.nombre || '').trim().toUpperCase() &&
+        cleanCedula === (matchingMutation.rep.cedula || '').replace(/\D/g, '') &&
+        (repFromSheet.telefono || '') === (matchingMutation.rep.telefono || '') &&
+        (repFromSheet.correo || '').toLowerCase() === (matchingMutation.rep.correo || '').toLowerCase() &&
+        (repFromSheet.ciudad || '').toUpperCase() === (matchingMutation.rep.ciudad || '').toUpperCase() &&
+        (repFromSheet.region || '').toUpperCase() === (matchingMutation.rep.region || '').toUpperCase() &&
+        (repFromSheet.unidadNegocio || '').toUpperCase() === (matchingMutation.rep.unidadNegocio || '').toUpperCase() &&
+        (repFromSheet.gerenteDistrito || '').toUpperCase() === (matchingMutation.rep.gerenteDistrito || '').toUpperCase() &&
+        (repFromSheet.codigoSector || '') === (matchingMutation.rep.codigoSector || '');
+
+      if (!sheetReflectsMutation) {
+        freshReps.push({
+          ...(existing || {}),
+          ...repFromSheet,
+          ...matchingMutation.rep,
+        } as Representante);
+        unchangedCount++;
+        return;
+      }
+    }
 
     if (existing) {
       const hasChanges =
@@ -865,6 +961,20 @@ export async function pullRepsFromSpreadsheet(
     }
   });
 
+  // Also ensure any newly created local reps that haven't appeared in cached CSV yet remain in the list
+  mutationList.forEach(m => {
+    if (m.action === 'create' && !matchedMutationIds.has(m.rep.id)) {
+      const alreadyInFresh = freshReps.some(
+        r =>
+          r.id === m.rep.id ||
+          (r.cedula && m.rep.cedula && r.cedula.replace(/\D/g, '') === m.rep.cedula.replace(/\D/g, ''))
+      );
+      if (!alreadyInFresh) {
+        freshReps.push(m.rep);
+      }
+    }
+  });
+
   // Update last sync time
   const currentInfo = getLinkedSpreadsheetInfo();
   if (currentInfo && currentInfo.spreadsheetId === spreadsheetId) {
@@ -893,15 +1003,106 @@ export interface PushSyncResult {
 
 /**
  * PUSH SYNC: When adding or editing a representative in the app,
- * insert or update the corresponding row in the linked Google Sheet.
+ * insert or update the corresponding row in the linked Google Sheet
+ * via Google Apps Script Web App (POST with text/plain;charset=utf-8 to avoid CORS preflight)
+ * or Google Sheets REST API v4.
  */
 export async function syncRepToSpreadsheet(
   spreadsheetId: string,
   rep: Representante,
-  tabName?: string
+  tabName?: string,
+  originalRep?: Representante,
+  isEdit: boolean = true
 ): Promise<PushSyncResult> {
+  // Always persist the mutation locally first so reloads never lose data
+  saveLocalRepMutation(rep, isEdit ? 'update' : 'create', originalRep, false);
+
+  const scriptEndpoint =
+    (spreadsheetId && spreadsheetId.includes('script.google.com') ? spreadsheetId : '') ||
+    getGoogleSheetsScriptUrl();
+
+  const defaultTab = tabName || 'Representantes';
+
+  // 1. Priority Path: Google Apps Script Web App Endpoint (POST with text/plain;charset=utf-8 for CORS compatibility)
+  if (scriptEndpoint) {
+    const glue = scriptEndpoint.includes('?') ? '&' : '?';
+    const postUrl = `${scriptEndpoint}${glue}t=${Date.now()}`;
+    const payload = {
+      action: isEdit ? 'update' : 'create',
+      id: rep.id,
+      originalId: originalRep?.id || rep.id,
+      originalCedula: (originalRep?.cedula || rep.cedula || '').replace(/\D/g, ''),
+      originalNombre: (originalRep?.nombre || rep.nombre || '').trim().toUpperCase(),
+      originalCodigoSector: (originalRep?.codigoSector || rep.codigoSector || '').trim(),
+      cedula: (rep.cedula || '').replace(/\D/g, ''),
+      nombre: (rep.nombre || '').trim().toUpperCase(),
+      codigoSector: (rep.codigoSector || '').trim(),
+      telefono: rep.telefono || '',
+      correo: rep.correo || '',
+      ciudad: rep.ciudad || '',
+      estado: rep.estado || '',
+      region: rep.region || '',
+      unidadNegocio: rep.unidadNegocio || '',
+      gerenteDistrito: rep.gerenteDistrito || '',
+      fechaIngreso: rep.fechaIngreso || '',
+      status: rep.status || 'ACTIVO',
+      tipoRepresentante: rep.tipoRepresentante || 'Visita Médica',
+      sheetName: defaultTab,
+      spreadsheetId: spreadsheetId && !spreadsheetId.includes('script.google.com') ? spreadsheetId : '',
+      data: rep,
+      rowValues: repToRowByHeaders(rep, CALOX_REP_HEADERS),
+      headers: CALOX_REP_HEADERS,
+    };
+
+    const scriptRes = await fetch(postUrl, {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-store',
+      redirect: 'follow',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!scriptRes.ok) {
+      const errText = await scriptRes.text().catch(() => '');
+      throw new Error(`Error al guardar en Google Apps Script (${scriptRes.status}): ${errText || scriptRes.statusText}`);
+    }
+
+    const responseText = await scriptRes.text();
+    let parsedResult: any = null;
+    try {
+      parsedResult = JSON.parse(responseText);
+    } catch {
+      // Apps Script may return plain text or HTML if misconfigured
+      if (responseText.includes('<!DOCTYPE html>') && responseText.includes('script.google.com')) {
+        throw new Error(
+          'El Web App de Google Apps Script devolvió una página de permisos. Asegúrate de implementarlo con acceso para "Cualquier persona" (Anyone).'
+        );
+      }
+    }
+
+    if (parsedResult && (parsedResult.status === 'error' || parsedResult.ok === false || parsedResult.error)) {
+      throw new Error(parsedResult.message || parsedResult.error || 'Error reportado por Google Apps Script al actualizar la fila.');
+    }
+
+    saveLocalRepMutation(rep, isEdit ? 'update' : 'create', originalRep, true);
+
+    return {
+      action: parsedResult?.action === 'created' || !isEdit ? 'created' : 'updated',
+      rowNumber: Number(parsedResult?.row || parsedResult?.rowNumber || 1),
+      sheetTitle: parsedResult?.sheetName || defaultTab,
+    };
+  }
+
+  // 2. Secondary Path: Direct Google Sheets API v4 (requires Google OAuth access token)
   const token = await getAccessToken();
-  if (!token) throw new Error('Debes iniciar sesión con Google para sincronizar con la hoja.');
+  if (!token || token === 'local-token') {
+    throw new Error(
+      'Para guardar cambios en Google Sheets sin iniciar sesión con OAuth, configura la URL de tu Google Apps Script (doPost) en la pestaña "Google Sheets", o inicia sesión con tu cuenta de Google.'
+    );
+  }
 
   let targetTab = tabName;
   if (!targetTab) {
@@ -909,16 +1110,14 @@ export async function syncRepToSpreadsheet(
     targetTab = details.sheets.find(s => s.toLowerCase().includes('representante')) || details.sheets[0] || 'Representantes';
   }
 
-  // 1. Read existing rows across all columns to find matches and inspect actual headers
+  // Read existing rows across all columns to find matches and inspect actual headers
   const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
   const readRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
     {
       cache: 'no-store',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
       },
     }
   );
@@ -939,6 +1138,8 @@ export async function syncRepToSpreadsheet(
 
   const cleanCedula = rep.cedula?.replace(/\D/g, '') || '';
   const cleanNombre = rep.nombre?.trim().toUpperCase() || '';
+  const origCleanCedula = originalRep?.cedula?.replace(/\D/g, '') || cleanCedula;
+  const origCleanNombre = originalRep?.nombre?.trim().toUpperCase() || cleanNombre;
 
   if (rows.length > 1) {
     for (let i = 1; i < rows.length; i++) {
@@ -949,12 +1150,20 @@ export async function syncRepToSpreadsheet(
       const rowCedula = cedulaIdx !== undefined && row[cedulaIdx] ? String(row[cedulaIdx]).replace(/\D/g, '') : '';
       const rowNombre = nombreIdx !== undefined && row[nombreIdx] ? String(row[nombreIdx]).trim().toUpperCase() : '';
 
-      const directCedulaMatch = cleanCedula && rowCedula && cleanCedula === rowCedula;
-      const directNombreMatch = cleanNombre && rowNombre && cleanNombre === rowNombre;
+      const directCedulaMatch =
+        (origCleanCedula && rowCedula && origCleanCedula === rowCedula) ||
+        (cleanCedula && rowCedula && cleanCedula === rowCedula);
+      const directNombreMatch =
+        (origCleanNombre && rowNombre && origCleanNombre === rowNombre) ||
+        (cleanNombre && rowNombre && cleanNombre === rowNombre);
 
       // Robust check: also search across any cell in the row in case previous data was shifted
-      const anyCellCedulaMatch = cleanCedula && row.some(cell => String(cell).replace(/\D/g, '') === cleanCedula);
-      const anyCellNombreMatch = cleanNombre && row.some(cell => String(cell).trim().toUpperCase() === cleanNombre);
+      const anyCellCedulaMatch =
+        (origCleanCedula && row.some(cell => String(cell).replace(/\D/g, '') === origCleanCedula)) ||
+        (cleanCedula && row.some(cell => String(cell).replace(/\D/g, '') === cleanCedula));
+      const anyCellNombreMatch =
+        (origCleanNombre && row.some(cell => String(cell).trim().toUpperCase() === origCleanNombre)) ||
+        (cleanNombre && row.some(cell => String(cell).trim().toUpperCase() === cleanNombre));
 
       if (directCedulaMatch || directNombreMatch || anyCellCedulaMatch || anyCellNombreMatch) {
         targetRowIndex = i + 1; // 1-indexed in Google Sheets
@@ -987,6 +1196,8 @@ export async function syncRepToSpreadsheet(
       const err = await updateRes.text();
       throw new Error(`Error al actualizar fila en Google Sheets (${updateRes.status}): ${err}`);
     }
+
+    saveLocalRepMutation(rep, 'update', originalRep, true);
 
     return {
       action: 'updated',
@@ -1032,6 +1243,8 @@ export async function syncRepToSpreadsheet(
       throw new Error(`Error al agregar fila en Google Sheets (${appendRes.status}): ${err}`);
     }
 
+    saveLocalRepMutation(rep, 'create', originalRep, true);
+
     return {
       action: 'created',
       rowNumber: rows.length + 1,
@@ -1074,13 +1287,11 @@ export async function getOrCreateCanonicalSpreadsheet(
   // 2. Search user's Drive for existing database file
   try {
     const searchRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id, name)&pageSize=20&timestamp=${Date.now()}`,
+      `https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet' and trashed=false&fields=files(id, name)&pageSize=20`,
       {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       }
     );
@@ -1133,8 +1344,66 @@ export async function deleteRepFromSpreadsheet(
   nombre?: string,
   tabName?: string
 ): Promise<boolean> {
+  // Record deletion locally first
+  saveLocalRepMutation(
+    {
+      id: repId,
+      num: '',
+      nombre: nombre || '',
+      cedula: cedula || '',
+      telefono: '',
+      correo: '',
+      status: 'INACTIVO',
+      region: '',
+      ciudad: '',
+      estado: '',
+      unidadNegocio: '',
+      tipoRepresentante: 'Visita Médica',
+      gerenteDistrito: '',
+      codigoSector: '',
+      secuencia: '',
+      fechaIngreso: '',
+    },
+    'delete',
+    undefined,
+    false
+  );
+
+  const scriptEndpoint =
+    (spreadsheetId && spreadsheetId.includes('script.google.com') ? spreadsheetId : '') ||
+    getGoogleSheetsScriptUrl();
+
+  if (scriptEndpoint) {
+    try {
+      const glue = scriptEndpoint.includes('?') ? '&' : '?';
+      const postUrl = `${scriptEndpoint}${glue}t=${Date.now()}`;
+      const res = await fetch(postUrl, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-store',
+        redirect: 'follow',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          id: repId,
+          originalCedula: (cedula || '').replace(/\D/g, ''),
+          originalNombre: (nombre || '').trim().toUpperCase(),
+          cedula: (cedula || '').replace(/\D/g, ''),
+          nombre: (nombre || '').trim().toUpperCase(),
+          sheetName: tabName || 'Representantes',
+          spreadsheetId: spreadsheetId && !spreadsheetId.includes('script.google.com') ? spreadsheetId : '',
+        }),
+      });
+      if (res.ok) return true;
+    } catch (scriptErr) {
+      console.error('Error deleting row via Google Apps Script:', scriptErr);
+    }
+  }
+
   const token = await getAccessToken();
-  if (!token) return false;
+  if (!token || token === 'local-token') return false;
 
   try {
     let targetTab = tabName;
@@ -1145,13 +1414,11 @@ export async function deleteRepFromSpreadsheet(
 
     const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
     const readRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
       {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       }
     );
@@ -1184,12 +1451,10 @@ export async function deleteRepFromSpreadsheet(
     }
 
     if (targetRowIndex > 0) {
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       });
       if (metaRes.ok) {
@@ -1239,12 +1504,10 @@ export async function ensureSheetTabExists(
   const token = await getAccessToken();
   if (!token) throw new Error('Token de Google no disponible.');
 
-  const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+  const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
     cache: 'no-store',
     headers: {
       Authorization: `Bearer ${token}`,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
     },
   });
 
@@ -1341,13 +1604,11 @@ export async function syncGdToSpreadsheet(
 
   const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
   const readRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
     {
       cache: 'no-store',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
       },
     }
   );
@@ -1464,13 +1725,11 @@ export async function deleteGdFromSpreadsheet(
     const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Gerentes de Distrito', CALOX_GD_HEADERS));
     const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
     const readRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
       {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       }
     );
@@ -1503,12 +1762,10 @@ export async function deleteGdFromSpreadsheet(
     }
 
     if (targetRowIndex > 0) {
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       });
       if (metaRes.ok) {
@@ -1561,13 +1818,11 @@ export async function syncCredencialToSpreadsheet(
 
   const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
   const readRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
     {
       cache: 'no-store',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
       },
     }
   );
@@ -1682,13 +1937,11 @@ export async function deleteCredencialFromSpreadsheet(
     const targetTab = tabName || (await ensureSheetTabExists(spreadsheetId, 'Credenciales Droguerías', CALOX_CREDENCIALES_HEADERS));
     const readRange = `${encodeURIComponent(targetTab)}!A1:Z`;
     const readRes = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}?timestamp=${Date.now()}`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${readRange}`,
       {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       }
     );
@@ -1719,12 +1972,10 @@ export async function deleteCredencialFromSpreadsheet(
     }
 
     if (targetRowIndex > 0) {
-      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?timestamp=${Date.now()}`, {
+      const metaRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
         },
       });
       if (metaRes.ok) {

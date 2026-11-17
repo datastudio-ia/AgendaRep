@@ -10,6 +10,8 @@ import {
   CANONICAL_DATABASE_TITLE,
   fetchGenericSpreadsheet,
   parseCsvText,
+  getGoogleSheetsScriptUrl,
+  setGoogleSheetsScriptUrl,
 } from '../services/sheetsService';
 import { exportRepsToExcel, exportGdsToExcel, exportCredencialesToExcel } from '../utils/excelExport';
 import {
@@ -103,6 +105,24 @@ export const GoogleSheetsSync: React.FC<GoogleSheetsSyncProps> = ({
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+
+  // Google Apps Script Web App URL state (for CORS-safe POST update/create/delete)
+  const [appsScriptUrl, setAppsScriptUrl] = useState<string>(() => getGoogleSheetsScriptUrl());
+  const [appsScriptSavedMsg, setAppsScriptSavedMsg] = useState<string | null>(null);
+  const [showAppsScriptCode, setShowAppsScriptCode] = useState(false);
+  const [copiedScriptCode, setCopiedScriptCode] = useState(false);
+
+  const handleSaveAppsScriptUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = appsScriptUrl.trim();
+    setGoogleSheetsScriptUrl(trimmed);
+    setAppsScriptSavedMsg(
+      trimmed
+        ? 'Endpoint de Google Apps Script guardado. Las ediciones de representantes se enviarán automáticamente vía POST (action: "update").'
+        : 'URL de Google Apps Script eliminada.'
+    );
+    setTimeout(() => setAppsScriptSavedMsg(null), 5000);
+  };
 
   // Database Visualizer state
   type PreviewTab = 'reps' | 'gds' | 'credenciales';
@@ -1241,6 +1261,77 @@ export const GoogleSheetsSync: React.FC<GoogleSheetsSyncProps> = ({
 
             {exportError && <p className="text-xs text-rose-600 font-medium">{exportError}</p>}
           </div>
+        </div>
+
+        {/* Option C: Google Apps Script Web App URL (doPost / doGet) */}
+        <div className="mt-4 bg-[#F8F4F2] p-5 rounded-2xl border border-[#EAE5E1] space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold text-[#1A1A1E]">
+                <Database className="w-4 h-4 text-theme-primary" />
+                <span>Endpoint de Google Apps Script (Sincronización POST sin bloqueo CORS)</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                Pega la URL de tu aplicación web de Google Apps Script (<code className="font-mono text-slate-700">https://script.google.com/macros/s/.../exec</code>) para guardar ediciones de representantes automáticamente mediante <code className="font-mono text-slate-700">POST</code> (<code className="font-mono text-slate-700">action: 'update'</code>).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAppsScriptCode(!showAppsScriptCode)}
+              className="px-3.5 py-2 text-xs font-bold text-theme-primary bg-white hover:bg-slate-50 border border-[#EAE5E1] rounded-full transition-all cursor-pointer shrink-0"
+            >
+              {showAppsScriptCode ? 'Ocultar código doPost(e)' : 'Ver código doPost(e) para Google Sheets'}
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveAppsScriptUrl} className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="url"
+              value={appsScriptUrl}
+              onChange={(e) => setAppsScriptUrl(e.target.value)}
+              placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+              className="flex-1 px-4 py-2.5 text-xs bg-white border border-[#EAE5E1] rounded-full focus:outline-none focus:ring-2 focus:ring-theme-primary font-mono"
+            />
+            <button
+              type="submit"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-theme-primary hover:bg-theme-primary-hover rounded-full transition-all shadow-xs cursor-pointer shrink-0"
+            >
+              Guardar Endpoint POST
+            </button>
+          </form>
+
+          {appsScriptSavedMsg && (
+            <p className="text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span>{appsScriptSavedMsg}</span>
+            </p>
+          )}
+
+          {showAppsScriptCode && (
+            <div className="mt-3 bg-[#1A1A1E] text-slate-100 rounded-2xl p-4 space-y-2 border border-slate-800">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                <span className="text-[11px] font-bold text-emerald-400">
+                  Código completo para Extensiones → Apps Script (Código.gs)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const code = `function doPost(e) {\n  var lock = LockService.getScriptLock();\n  lock.tryLock(10000);\n  try {\n    var raw = e && e.postData && e.postData.contents ? e.postData.contents : '{}';\n    var payload = JSON.parse(raw);\n    var action = String(payload.action || 'update').toLowerCase();\n    var ss = payload.spreadsheetId ? SpreadsheetApp.openById(payload.spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();\n    var sheet = ss.getSheetByName(payload.sheetName || 'Representantes') || ss.getSheets()[0];\n    var data = sheet.getDataRange().getValues();\n    var headers = data.length > 0 ? data[0] : ['Codigo','Cedula','Representante','Telefono','Correo','Ciudad','Estado','Region','Unidad de Negocio','Gerente de Distrito','Fecha de Ingreso','Estatus'];\n    if (data.length === 0) { sheet.appendRow(headers); data = [headers]; }\n    var norm = function(v) { return String(v || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9]/g, ''); };\n    var digits = function(v) { return String(v || '').replace(/\\D/g, ''); };\n    var upper = function(v) { return String(v || '').trim().toUpperCase(); };\n    var origCed = digits(payload.originalCedula || (payload.data && payload.data.cedula) || payload.cedula);\n    var newCed = digits((payload.data && payload.data.cedula) || payload.cedula);\n    var origNom = upper(payload.originalNombre || (payload.data && payload.data.nombre) || payload.nombre);\n    var newNom = upper((payload.data && payload.data.nombre) || payload.nombre);\n    var targetRow = -1;\n    for (var i = 1; i < data.length; i++) {\n      var row = data[i];\n      var match = row.some(function(cell) {\n        var cDig = digits(cell);\n        var cUp = upper(cell);\n        return (origCed && cDig === origCed) || (newCed && cDig === newCed) || (origNom && cUp === origNom) || (newNom && cUp === newNom);\n      });\n      if (match) { targetRow = i + 1; break; }\n    }\n    if (action === 'delete') {\n      if (targetRow > 1) sheet.deleteRow(targetRow);\n      return ContentService.createTextOutput(JSON.stringify({ status: 'success', ok: true, action: 'deleted', row: targetRow })).setMimeType(ContentService.MimeType.JSON);\n    }\n    var rep = payload.data || payload;\n    var rowValues = Array.isArray(payload.rowValues) && payload.rowValues.length === headers.length ? payload.rowValues : [\n      rep.codigoSector || '', rep.cedula || '', rep.nombre || '', rep.telefono || '', rep.correo || '',\n      rep.ciudad || '', rep.estado || '', rep.region || '', rep.unidadNegocio || '', rep.gerenteDistrito || '',\n      rep.fechaIngreso || '', rep.status || 'ACTIVO'\n    ];\n    if (targetRow > 1) {\n      sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);\n      SpreadsheetApp.flush();\n      return ContentService.createTextOutput(JSON.stringify({ status: 'success', ok: true, action: 'updated', row: targetRow })).setMimeType(ContentService.MimeType.JSON);\n    } else {\n      sheet.appendRow(rowValues);\n      SpreadsheetApp.flush();\n      return ContentService.createTextOutput(JSON.stringify({ status: 'success', ok: true, action: 'created', row: sheet.getLastRow() })).setMimeType(ContentService.MimeType.JSON);\n    }\n  } catch (err) {\n    return ContentService.createTextOutput(JSON.stringify({ status: 'error', ok: false, message: err.toString() })).setMimeType(ContentService.MimeType.JSON);\n  } finally {\n    lock.releaseLock();\n  }\n}`;
+                    navigator.clipboard.writeText(code);
+                    setCopiedScriptCode(true);
+                    setTimeout(() => setCopiedScriptCode(false), 2500);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-full cursor-pointer"
+                >
+                  {copiedScriptCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedScriptCode ? '¡Código Copiado!' : 'Copiar Código Apps Script'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                En tu Google Sheet ve a <strong>Extensiones → Apps Script</strong>, pega este código, haz clic en <strong>Implementar → Nueva implementación → Aplicación web</strong>, selecciona Ejecutar como <strong>"Yo"</strong> y Quién tiene acceso: <strong>"Cualquier persona"</strong>, y pega la URL generada arriba.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

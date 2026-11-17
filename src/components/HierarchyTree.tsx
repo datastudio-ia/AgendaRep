@@ -1,21 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Representante, GerenteDistrito, isRepComercial, isRepActive, isGdActive } from '../types/contact';
+import { Representante, GerenteDistrito, isRepActive, isGdActive } from '../types/contact';
 import {
-  Network,
-  Users,
-  Briefcase,
-  ChevronDown,
-  ChevronUp,
-  MessageCircle,
-  Eye,
-  Building,
-  UserCheck,
+  Search,
+  X,
   Stethoscope,
   ShoppingBag,
   Layers,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Network,
 } from 'lucide-react';
-import { getWhatsAppUrl } from '../utils/phoneUtils';
-import { getMappedUnit } from '../App';
 
 interface HierarchyTreeProps {
   reps: Representante[];
@@ -24,34 +19,88 @@ interface HierarchyTreeProps {
   onSelectGd: (gd: GerenteDistrito) => void;
 }
 
+type OrgPaletteKey = 'sage_sand' | 'ocean_mist' | 'warm_pastel';
+
+interface OrgPaletteConfig {
+  label: string;
+  canvasBg: string;
+  connectorColor: string;
+  rootNode: string;
+  leaderMedicaNode: string;
+  leaderComercialNode: string;
+  managerNode: string;
+  rowStyles: string[];
+}
+
+const ORG_PALETTES: Record<OrgPaletteKey, OrgPaletteConfig> = {
+  sage_sand: {
+    label: 'Salvia & Arena',
+    canvasBg: 'bg-gradient-to-b from-[#EAF3FF] via-[#EFF6FF] to-[#E5F0FE] border-blue-200/80',
+    connectorColor: 'bg-[#94A3B8]',
+    rootNode: 'bg-[#1F2933] text-[#F8FAFC] border-[#111827]',
+    leaderMedicaNode: 'bg-[#2C5E55] text-white border-[#1F463F]',
+    leaderComercialNode: 'bg-[#3D4E6D] text-white border-[#2B3952]',
+    managerNode: 'bg-[#323F4B] hover:bg-[#1F2933] text-white border-[#1F2933]',
+    rowStyles: [
+      'bg-[#E3EFEA] hover:bg-[#D2E5DD] border-[#B3CFC3] text-[#1B332A]', // Salvia suave
+      'bg-[#F4ECE1] hover:bg-[#EADBC8] border-[#D5C3AA] text-[#3A2E1F]', // Arena cálida
+      'bg-[#E6EBF2] hover:bg-[#D5DFEC] border-[#B6C5D8] text-[#1F2D3D]', // Bruma azulada
+      'bg-[#F3E5E2] hover:bg-[#E9D2CD] border-[#D4B5AE] text-[#3D2520]', // Arcilla suave
+    ],
+  },
+  ocean_mist: {
+    label: 'Océano & Bruma',
+    canvasBg: 'bg-gradient-to-b from-[#EAF3FF] via-[#EFF6FF] to-[#E5F0FE] border-blue-200/80',
+    connectorColor: 'bg-[#94A3B8]',
+    rootNode: 'bg-[#0F172A] text-white border-[#020617]',
+    leaderMedicaNode: 'bg-[#0E7490] text-white border-[#155E75]',
+    leaderComercialNode: 'bg-[#1D4ED8] text-white border-[#1E40AF]',
+    managerNode: 'bg-[#1E293B] hover:bg-[#0F172A] text-white border-[#0F172A]',
+    rowStyles: [
+      'bg-[#E0F2FE] hover:bg-[#BAE6FD] border-[#93C5FD] text-[#0C4A6E]', // Cielo tenue
+      'bg-[#CCFBF1] hover:bg-[#99F6E4] border-[#5EEAD4] text-[#134E4A]', // Turquesa pálido
+      'bg-[#E0E7FF] hover:bg-[#C7D2FE] border-[#A5B4FC] text-[#1E1B4B]', // Índigo bruma
+      'bg-[#F8FAFC] hover:bg-[#E2E8F0] border-[#CBD5E1] text-[#0F172A]', // Pizarra perla
+    ],
+  },
+  warm_pastel: {
+    label: 'Pastel Suave',
+    canvasBg: 'bg-gradient-to-b from-[#EAF3FF] via-[#EFF6FF] to-[#E5F0FE] border-blue-200/80',
+    connectorColor: 'bg-[#94A3B8]',
+    rootNode: 'bg-[#292524] text-white border-[#1C1917]',
+    leaderMedicaNode: 'bg-[#44403C] text-white border-[#292524]',
+    leaderComercialNode: 'bg-[#57534E] text-white border-[#44403C]',
+    managerNode: 'bg-[#3F3B39] hover:bg-[#292524] text-white border-[#292524]',
+    rowStyles: [
+      'bg-[#F9F0C7] hover:bg-[#F3E5A8] border-[#DEC983] text-[#3B3212]', // Crema vainilla
+      'bg-[#E5E3F7] hover:bg-[#D4D0F2] border-[#B7B2E0] text-[#262344]', // Lavanda tenue
+      'bg-[#E2F4DC] hover:bg-[#CFEBC6] border-[#AFD4A3] text-[#1D3616]', // Menta pastel
+      'bg-[#F7DFDC] hover:bg-[#F0CBC6] border-[#D9AEA8] text-[#401F1B]', // Coral empolvado
+    ],
+  },
+};
+
 export const HierarchyTree: React.FC<HierarchyTreeProps> = ({
   reps,
   gds,
   onSelectRep,
   onSelectGd,
 }) => {
-  // Default to Promoción Médica (Isabel Medina)
   const [activeDivision, setActiveDivision] = useState<'medica' | 'comercial' | 'all'>('medica');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [zoom, setZoom] = useState<number>(100);
 
-  const activeReps = useMemo(() => reps.filter((r) => isRepActive(r)), [reps]);
-  const activeGds = useMemo(() => gds.filter((g) => isGdActive(g)), [gds]);
+  const palette = ORG_PALETTES.sage_sand;
 
-  // Baseline metrics (Solo representantes y líderes activos)
-  const countGerentesDistrito = useMemo(() => {
-    return activeGds.filter((g) => g.supervisor?.toUpperCase() === 'ISABEL MEDINA' || !g.cargo.toUpperCase().includes('COORDINADOR')).length;
-  }, [activeGds]);
-
-  const countCoordinadores = useMemo(() => {
-    return activeGds.filter((g) => g.supervisor?.toUpperCase() === 'JUANITA HURTADO' || g.cargo.toUpperCase().includes('COORDINADOR')).length;
-  }, [activeGds]);
-
-  const countVisitaMedica = useMemo(() => {
-    return activeReps.filter((r) => !isRepComercial(r)).length;
-  }, [activeReps]);
-
-  const countComerciales = useMemo(() => {
-    return activeReps.filter((r) => isRepComercial(r)).length;
-  }, [activeReps]);
+  // Unique regions list for quick filtering
+  const availableRegions = useMemo(() => {
+    const set = new Set<string>();
+    gds.forEach((g) => {
+      if (g.region) set.add(g.region.trim().toUpperCase());
+    });
+    return Array.from(set).sort();
+  }, [gds]);
 
   // Robust lookup of reps by manager with alias and canonical resolution
   const managerToReps = useMemo(() => {
@@ -79,32 +128,7 @@ export const HierarchyTree: React.FC<HierarchyTreeProps> = ({
     return map;
   }, [reps, gds]);
 
-  // Track expanded nodes
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    gds.forEach((g) => (init[g.nombre.trim()] = true));
-    init['ROOT'] = true;
-    return init;
-  });
-
-  const toggleNode = (nodeId: string) => {
-    setExpandedNodes((prev) => ({
-      ...prev,
-      [nodeId]: !prev[nodeId],
-    }));
-  };
-
-  const expandAll = () => {
-    const all: Record<string, boolean> = { ROOT: true };
-    gds.forEach((g) => (all[g.nombre.trim()] = true));
-    setExpandedNodes(all);
-  };
-
-  const collapseAll = () => {
-    setExpandedNodes({ ROOT: true });
-  };
-
-  // Group managers by supervisor from database adjustments
+  // Group managers by division
   const medicaGds = useMemo(() => {
     return gds.filter(
       (g) =>
@@ -121,111 +145,150 @@ export const HierarchyTree: React.FC<HierarchyTreeProps> = ({
     );
   }, [gds]);
 
-  const renderManagerCard = (gd: GerenteDistrito) => {
-    const teamReps = managerToReps[gd.nombre.trim()] || [];
-    const isExpanded = expandedNodes[gd.nombre.trim()] ?? true;
-    const isCoordinator = gd.cargo.toUpperCase().includes('COORDINADOR');
+  // Filter managers based on search query and region
+  const filterManagers = (list: GerenteDistrito[]) => {
+    return list.filter((gd) => {
+      const team = managerToReps[gd.nombre.trim()] || [];
+      const matchesRegion =
+        selectedRegion === 'all' ||
+        gd.region?.toUpperCase().includes(selectedRegion.toUpperCase());
+
+      if (!matchesRegion) return false;
+      if (!searchQuery.trim()) return true;
+
+      const q = searchQuery.toLowerCase().trim();
+      const matchGd =
+        gd.nombre.toLowerCase().includes(q) ||
+        gd.region.toLowerCase().includes(q);
+
+      const matchAnyRep = team.some((r) => r.nombre.toLowerCase().includes(q));
+      return matchGd || matchAnyRep;
+    });
+  };
+
+  const filteredMedicaGds = useMemo(
+    () => filterManagers(medicaGds),
+    [medicaGds, managerToReps, selectedRegion, searchQuery]
+  );
+  const filteredComercialGds = useMemo(
+    () => filterManagers(comercialGds),
+    [comercialGds, managerToReps, selectedRegion, searchQuery]
+  );
+
+  // Render an organigrama branch with the selected color palette
+  const renderOrgChartBranch = (
+    secondLeaderName: string,
+    managers: GerenteDistrito[],
+    branchType: 'medica' | 'comercial'
+  ) => {
+    const q = searchQuery.toLowerCase().trim();
+    const leaderNodeClass =
+      branchType === 'medica' ? palette.leaderMedicaNode : palette.leaderComercialNode;
 
     return (
-      <div
-        key={gd.id}
-        className="bg-white rounded-2xl border border-[#EAE5E1] shadow-2xs flex flex-col justify-between overflow-hidden transition-all hover:shadow-sm hover:border-theme-30"
-      >
-        {/* Manager Header Card */}
-        <div className="p-3 border-b border-[#EAE5E1] bg-gradient-to-b from-white to-[#F8F4F2]/40">
-          <div className="flex items-start justify-between gap-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 shadow-2xs ${
-                  isCoordinator
-                    ? 'bg-gradient-to-br from-indigo-500 to-indigo-600'
-                    : 'theme-gradient-bg'
-                }`}
-              >
-                <UserCheck className="w-4.5 h-4.5" />
-              </div>
-              <div className="min-w-0">
-                <h4
-                  onClick={() => onSelectGd(gd)}
-                  className="text-xs md:text-sm font-bold text-[#1A1A1E] tracking-tight hover:text-theme-primary cursor-pointer transition-colors truncate"
-                  title={gd.nombre}
-                >
-                  {gd.nombre}
-                </h4>
-                <p className="text-[11px] text-slate-500 font-medium truncate">
-                  {gd.region} {gd.codigoSector && `· Sector ${gd.codigoSector}`}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="px-2 py-0.5 rounded-full bg-[#1A1A1E] text-white font-mono font-bold text-[10px]">
-                {teamReps.length} reps
-              </span>
-              {teamReps.length > 0 && (
-                <button
-                  onClick={() => toggleNode(gd.nombre.trim())}
-                  className="p-1 text-slate-400 hover:text-theme-primary cursor-pointer transition-colors rounded-lg hover:bg-slate-100"
-                  title={isExpanded ? 'Colapsar equipo' : 'Desplegar equipo'}
-                >
-                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
-              )}
-            </div>
-          </div>
+      <div className="flex flex-col items-center w-full">
+        {/* National Division Leader Pill Node */}
+        <div
+          className={`px-8 py-3.5 rounded-full border shadow-sm min-w-[220px] max-w-[290px] text-center ${leaderNodeClass}`}
+        >
+          <span className="text-xs sm:text-sm font-extrabold tracking-tight block leading-snug">
+            {secondLeaderName}
+          </span>
         </div>
 
-        {/* Subordinate Reps Branch */}
-        {isExpanded && teamReps.length > 0 && (
-          <div className="p-2 bg-[#F8F4F2]/60 flex-1 space-y-1.5">
-            {teamReps.map((rep) => {
-              const isComercial = isRepComercial(rep);
+        {/* Vertical Stem from Leader down to Horizontal Branching Bar */}
+        {managers.length > 0 && <div className={`w-0.5 h-7 ${palette.connectorColor}`} />}
+
+        {/* Manager Columns + Subordinate Vertical Chains */}
+        {managers.length > 0 ? (
+          <div className="flex items-start justify-center w-full">
+            {managers.map((gd, colIdx) => {
+              const rawTeam = managerToReps[gd.nombre.trim()] || [];
+              const teamReps = q
+                ? rawTeam.filter(
+                    (r) =>
+                      r.nombre.toLowerCase().includes(q) ||
+                      gd.nombre.toLowerCase().includes(q)
+                  )
+                : rawTeam;
+
+              const isFirst = colIdx === 0;
+              const isLast = colIdx === managers.length - 1;
+              const isSingle = managers.length === 1;
+              const gdActive = isGdActive(gd);
+
               return (
                 <div
-                  key={rep.id}
-                  className="px-2.5 py-1.5 bg-white rounded-xl border border-[#EAE5E1] flex items-center justify-between gap-2 group hover:border-theme-primary transition-all shadow-2xs"
+                  key={gd.id}
+                  className="flex flex-col items-center relative px-2 sm:px-2.5 flex-1 min-w-[175px] max-w-[225px]"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          isComercial ? 'bg-theme-secondary' : 'bg-theme-primary'
+                  {/* Horizontal connector line across columns */}
+                  {!isSingle && (
+                    <div className="w-full flex items-center h-0.5">
+                      <div
+                        className={`w-1/2 h-0.5 ${
+                          isFirst ? 'bg-transparent' : palette.connectorColor
                         }`}
                       />
-                      <span
-                        onClick={() => onSelectRep(rep)}
-                        className="text-[11px] font-bold text-[#1A1A1E] group-hover:text-theme-primary cursor-pointer truncate block"
-                        title={rep.nombre}
-                      >
-                        {rep.nombre}
-                      </span>
+                      <div
+                        className={`w-1/2 h-0.5 ${
+                          isLast ? 'bg-transparent' : palette.connectorColor
+                        }`}
+                      />
                     </div>
-                    <div className="text-[10px] text-slate-500 font-medium pl-3 truncate">
-                      {rep.ciudad} · {getMappedUnit(rep.unidadNegocio)}
-                    </div>
-                  </div>
+                  )}
 
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <a
-                      href={getWhatsAppUrl(rep.telefono, `Hola ${rep.nombre}`)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 text-slate-400 hover:text-emerald-600 transition-colors rounded hover:bg-slate-50"
-                      title="WhatsApp"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                    </a>
-                    <button
-                      onClick={() => onSelectRep(rep)}
-                      className="p-1 text-slate-400 hover:text-theme-primary transition-colors cursor-pointer rounded hover:bg-slate-50"
-                      title="Ver ficha"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {/* Vertical drop stem into Manager Box */}
+                  <div className={`w-0.5 h-6 ${palette.connectorColor}`} />
+
+                  {/* Manager / Coordinator Rectangular Node (Name Only) */}
+                  <button
+                    type="button"
+                    onClick={() => onSelectGd(gd)}
+                    className={`w-full min-h-[58px] px-3.5 py-3 rounded-xl border shadow-xs flex items-center justify-center text-center transition-all cursor-pointer ${palette.managerNode} ${
+                      !gdActive ? 'opacity-75' : ''
+                    }`}
+                    title={`Ver ficha de ${gd.nombre}`}
+                  >
+                    <span className="text-xs font-bold tracking-tight leading-snug break-words">
+                      {gd.nombre}
+                    </span>
+                  </button>
+
+                  {/* Vertical Chain of Collaborators (Representantes) */}
+                  {teamReps.map((rep, rowIdx) => {
+                    const rowStyle =
+                      palette.rowStyles[rowIdx % palette.rowStyles.length];
+                    const repActive = isRepActive(rep);
+
+                    return (
+                      <React.Fragment key={rep.id}>
+                        {/* Vertical connector line between boxes */}
+                        <div className={`w-0.5 h-4 ${palette.connectorColor}`} />
+
+                        {/* Collaborator Rectangular Node (Name Only) */}
+                        <button
+                          type="button"
+                          onClick={() => onSelectRep(rep)}
+                          className={`w-full min-h-[52px] px-3 py-2.5 rounded-xl border shadow-2xs flex items-center justify-center text-center transition-all cursor-pointer ${rowStyle} ${
+                            !repActive ? 'opacity-60' : ''
+                          }`}
+                          title={`Ver ficha de ${rep.nombre}`}
+                        >
+                          <span className="text-xs font-semibold leading-snug break-words">
+                            {rep.nombre}
+                          </span>
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
               );
             })}
+          </div>
+        ) : (
+          <div className="bg-white/80 rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 text-xs mt-4">
+            No se encontraron colaboradores con los filtros seleccionados.
           </div>
         )}
       </div>
@@ -233,162 +296,195 @@ export const HierarchyTree: React.FC<HierarchyTreeProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-5 w-full max-w-full overflow-x-hidden animate-in fade-in duration-200">
-      {/* Header Card with Division Switcher & Collapse/Expand */}
-      <div className="bg-white rounded-2xl p-3 md:p-4 border border-[#EAE5E1] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 w-full max-w-full">
-        <div className="flex items-center justify-between sm:justify-start gap-2">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-[#0850FD] to-indigo-600 flex items-center justify-center text-white shrink-0 shadow-2xs">
-              <Network className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+    <div className="flex flex-col gap-4 sm:gap-5 w-full max-w-full overflow-x-hidden animate-in fade-in duration-200">
+      {/* Header & Filter Card */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-5 border border-[#EAE5E1] shadow-2xs flex flex-col gap-3.5 w-full">
+        {/* Top Row: Title + Palette Selector + Division Selector */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-[#2C5E55] text-white flex items-center justify-center shadow-2xs shrink-0">
+              <Network className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h2 className="text-base md:text-lg font-black text-[#1A1A1E] tracking-tight truncate">
-              Organigrama Jerárquico
-            </h2>
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-black text-[#1A1A1E] tracking-tight truncate">
+                Organigrama de Colaboradores
+              </h3>
+              <p className="text-xs text-slate-500 font-medium truncate">
+                Haz clic sobre cualquier líder o colaborador para consultar su ficha
+              </p>
+            </div>
           </div>
 
-          <div className="flex sm:hidden items-center gap-1 shrink-0">
-            <button
-              onClick={expandAll}
-              className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-[#1A1A1E] bg-[#F8F4F2] hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              title="Expandir todos los equipos"
-            >
-              Expandir
-            </button>
-            <button
-              onClick={collapseAll}
-              className="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-[#1A1A1E] bg-[#F8F4F2] hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              title="Colapsar todos los equipos"
-            >
-              Colapsar
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Division Selector */}
+            <div className="grid grid-cols-3 sm:inline-flex p-1 bg-[#F8F4F2] rounded-xl sm:rounded-full border border-[#EAE5E1] w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setActiveDivision('medica')}
+                className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeDivision === 'medica'
+                    ? 'bg-[#2C5E55] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Stethoscope className="w-3.5 h-3.5 shrink-0" />
+                <span>Promoción Médica</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDivision('comercial')}
+                className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeDivision === 'comercial'
+                    ? 'bg-[#3D4E6D] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                <span>Comercial</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveDivision('all')}
+                className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg sm:rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeDivision === 'all'
+                    ? 'bg-[#1F2933] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 shrink-0" />
+                <span>Ambas Divisiones</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Division Selector & Desktop Controls */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          <div className="grid grid-cols-3 sm:inline-flex gap-1 p-1 sm:p-0.5 bg-[#F8F4F2] rounded-xl border border-[#EAE5E1] w-full sm:w-auto">
-            <button
-              onClick={() => setActiveDivision('medica')}
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer truncate ${
-                activeDivision === 'medica'
-                  ? 'bg-white text-theme-primary shadow-2xs'
-                  : 'text-slate-600 hover:text-[#1A1A1E]'
-              }`}
-            >
-              <Stethoscope className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate sm:hidden">Médica</span>
-              <span className="hidden sm:inline">Promoción Médica</span>
-            </button>
-            <button
-              onClick={() => setActiveDivision('comercial')}
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer truncate ${
-                activeDivision === 'comercial'
-                  ? 'bg-white text-indigo-600 shadow-2xs'
-                  : 'text-slate-600 hover:text-[#1A1A1E]'
-              }`}
-            >
-              <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Comercial</span>
-            </button>
-            <button
-              onClick={() => setActiveDivision('all')}
-              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-1 rounded-lg text-xs font-bold transition-all cursor-pointer truncate ${
-                activeDivision === 'all'
-                  ? 'bg-white text-[#1A1A1E] shadow-2xs'
-                  : 'text-slate-600 hover:text-[#1A1A1E]'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">General</span>
-            </button>
+        {/* Second Row: Search Input, Region Pills & Zoom Controls */}
+        <div className="pt-2.5 border-t border-[#EAE5E1]/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar colaborador por nombre..."
+              className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl sm:rounded-full text-[#1A1A1E] placeholder-slate-400 font-medium focus:outline-none focus:ring-2 focus:ring-[#2C5E55] focus:bg-white transition-all"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          <div className="hidden sm:flex items-center gap-1">
-            <button
-              onClick={expandAll}
-              className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-[#1A1A1E] bg-[#F8F4F2] hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              title="Expandir todos los equipos"
-            >
-              Expandir todo
-            </button>
-            <button
-              onClick={collapseAll}
-              className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-[#1A1A1E] bg-[#F8F4F2] hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-              title="Colapsar todos los equipos"
-            >
-              Colapsar todo
-            </button>
+          <div className="flex items-center justify-between sm:justify-end gap-2 overflow-x-auto scrollbar-none">
+            {/* Region Filter Buttons */}
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
+              <span className="text-slate-400 text-[11px] font-extrabold uppercase tracking-wider shrink-0 mr-0.5">
+                Región:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedRegion('all')}
+                className={`px-3 py-1.5 rounded-xl sm:rounded-full font-bold transition-colors cursor-pointer shrink-0 whitespace-nowrap border ${
+                  selectedRegion === 'all'
+                    ? 'bg-[#1F2933] text-white border-[#1F2933] shadow-2xs'
+                    : 'bg-[#F8F4F2] text-slate-700 border-[#EAE5E1] hover:bg-slate-200/60'
+                }`}
+              >
+                Todas
+              </button>
+              {availableRegions.map((reg) => (
+                <button
+                  key={reg}
+                  type="button"
+                  onClick={() => setSelectedRegion(reg)}
+                  className={`px-3 py-1.5 rounded-xl sm:rounded-full font-bold transition-colors cursor-pointer shrink-0 whitespace-nowrap border ${
+                    selectedRegion === reg
+                      ? 'bg-[#2C5E55] text-white border-[#2C5E55] shadow-2xs'
+                      : 'bg-[#F8F4F2] text-slate-700 border-[#EAE5E1] hover:bg-slate-200/60'
+                  }`}
+                >
+                  {reg}
+                </button>
+              ))}
+            </div>
+
+            {/* Zoom Controls */}
+            <div className="inline-flex items-center gap-1 bg-[#F8F4F2] px-2.5 py-1 rounded-xl sm:rounded-full border border-[#EAE5E1] shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  setZoom((z) => (z === 110 ? 100 : z === 100 ? 90 : 75))
+                }
+                className="p-1 text-slate-600 hover:text-slate-900 rounded cursor-pointer transition-colors"
+                title="Alejar"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-[11px] font-mono font-bold text-slate-700 px-1 tabular-nums">
+                {zoom}%
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setZoom((z) => (z === 75 ? 90 : z === 90 ? 100 : 110))
+                }
+                className="p-1 text-slate-600 hover:text-slate-900 rounded cursor-pointer transition-colors"
+                title="Acercar"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              {zoom !== 100 && (
+                <button
+                  type="button"
+                  onClick={() => setZoom(100)}
+                  className="p-1 text-slate-500 hover:text-slate-900 rounded cursor-pointer transition-colors"
+                  title="Restablecer zoom"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Visual Hierarchical Tree Container */}
-      <div className="flex flex-col gap-5 sm:gap-8 w-full max-w-full">
-        {/* Tree Branch 1: Promoción Médica (Isabel Medina) */}
-        {(activeDivision === 'medica' || activeDivision === 'all') && (
-          <div className="flex flex-col gap-2 sm:gap-4 w-full max-w-full">
-            {/* Level 1: Root Node (Isabel Medina) */}
-            <div className="flex flex-col items-center w-full">
-              <div className="bg-gradient-to-r from-[#1A1A1E] to-slate-800 text-white p-3 sm:p-3.5 rounded-2xl shadow-md border border-slate-700 w-full max-w-full sm:max-w-sm text-center relative">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl theme-gradient-bg flex items-center justify-center text-white mx-auto mb-1 sm:mb-1.5 shadow-2xs">
-                  <Building className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-                </div>
-                <h3 className="text-sm font-black tracking-tight text-white">
-                  Isabel Medina
-                </h3>
-                <p className="text-[11px] text-slate-300 font-medium">
-                  Gerente Nacional de Promoción Médica
-                </p>
-                <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center justify-center gap-3 text-[11px] font-mono">
-                  <span className="text-emerald-400 font-bold">● {countGerentesDistrito} Gerentes</span>
-                  <span className="text-theme-primary font-bold">● {countVisitaMedica} Visita Médica</span>
-                </div>
-              </div>
+      {/* Soft Blue Organigrama Canvas (Fondo Azul Tenue) */}
+      <div
+        className={`rounded-2xl sm:rounded-3xl border p-6 sm:p-10 overflow-x-auto shadow-inner min-h-[620px] transition-colors duration-200 ${palette.canvasBg}`}
+      >
+        <div
+          className={`origin-top transition-transform duration-150 min-w-max mx-auto flex flex-col gap-14 pb-8 ${
+            zoom === 75
+              ? 'scale-75'
+              : zoom === 90
+              ? 'scale-90'
+              : zoom === 110
+              ? 'scale-110'
+              : 'scale-100'
+          }`}
+        >
+          {/* Branch 1: Promoción Médica */}
+          {(activeDivision === 'medica' || activeDivision === 'all') &&
+            renderOrgChartBranch(
+              'Isabel Medina',
+              filteredMedicaGds,
+              'medica'
+            )}
 
-              {/* Central Stem Line */}
-              <div className="w-0.5 h-4 sm:h-6 bg-theme-primary opacity-40 my-0.5" />
-              <div className="w-2 h-2 rounded-full bg-theme-primary ring-2 ring-theme-20 mb-1 sm:mb-3" />
-            </div>
-
-            {/* Level 2: The 7 District Managers (1 col on mobile, up to 4 cols on PC) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3.5 w-full max-w-full">
-              {medicaGds.map(renderManagerCard)}
-            </div>
-          </div>
-        )}
-
-        {/* Tree Branch 2: Comercial & Trade Marketing (Juanita Hurtado) */}
-        {(activeDivision === 'comercial' || activeDivision === 'all') && (
-          <div className="flex flex-col gap-2 sm:gap-4 pt-1 sm:pt-2 w-full max-w-full">
-            {/* Level 1: Root Node (Juanita Hurtado) */}
-            <div className="flex flex-col items-center w-full">
-              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3 sm:p-3.5 rounded-2xl shadow-md border border-indigo-900/60 w-full max-w-full sm:max-w-sm text-center relative">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white mx-auto mb-1 sm:mb-1.5 shadow-2xs">
-                  <Building className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-                </div>
-                <h3 className="text-sm font-black tracking-tight text-white">
-                  Juanita Hurtado
-                </h3>
-                <p className="text-[11px] text-indigo-200 font-medium">
-                  Coordinación Comercial &amp; Trade Marketing
-                </p>
-                <div className="mt-2 pt-2 border-t border-indigo-800/60 flex items-center justify-center gap-3 text-[11px] font-mono">
-                  <span className="text-sky-300 font-bold">● {countCoordinadores} Coordinadores</span>
-                  <span className="text-indigo-300 font-bold">● {countComerciales} Comerciales</span>
-                </div>
-              </div>
-
-              {/* Central Stem Line */}
-              <div className="w-0.5 h-4 sm:h-6 bg-indigo-500 opacity-40 my-0.5" />
-              <div className="w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-indigo-200 mb-1 sm:mb-3" />
-            </div>
-
-            {/* Level 2: The Coordinators (1 col on mobile, up to 4 cols on PC) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3.5 w-full max-w-full">
-              {comercialGds.map(renderManagerCard)}
-            </div>
-          </div>
-        )}
+          {/* Branch 2: Comercial & Trade Marketing */}
+          {(activeDivision === 'comercial' || activeDivision === 'all') &&
+            renderOrgChartBranch(
+              'Juanita Hurtado',
+              filteredComercialGds,
+              'comercial'
+            )}
+        </div>
       </div>
     </div>
   );

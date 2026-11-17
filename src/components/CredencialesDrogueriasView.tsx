@@ -25,7 +25,11 @@ import {
   Pencil,
   RotateCcw,
   UserCheck,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
+
+const INITIAL_VISIBLE_USERS = 6;
 
 interface CredencialesDrogueriasViewProps {
   credenciales: CredencialDrogueria[];
@@ -38,46 +42,114 @@ interface CredencialesDrogueriasViewProps {
   onExportExcel?: () => void;
 }
 
-export const DROGUERIAS_METADATA: Record<string, { name: string; color: string; badgeBg: string; textColor: string; borderColor: string; portal: string }> = {
+export interface DrogueriaContacto {
+  nombre?: string;
+  cargo?: string;
+  correo: string;
+  etiquetaCompleta: string;
+}
+
+export const DROGUERIAS_METADATA: Record<
+  string,
+  {
+    name: string;
+    displayTitle: string;
+    color: string;
+    badgeBg: string;
+    textColor: string;
+    borderColor: string;
+    portal: string;
+    contactos: DrogueriaContacto[];
+  }
+> = {
   BLV: {
     name: 'BLV',
+    displayTitle: 'Droguería BLV',
     color: 'from-blue-600 to-indigo-600',
     badgeBg: 'bg-blue-50',
     textColor: 'text-blue-700',
     borderColor: 'border-blue-200',
     portal: 'https://blv-orders.greicodex.com/',
+    contactos: [
+      {
+        nombre: 'Claritza Santos',
+        cargo: 'Gte. Nacional de Ventas',
+        correo: 'csantos@drogueriablv.com',
+        etiquetaCompleta: 'Claritza Santos (Gte. Nacional de Ventas) | csantos@drogueriablv.com',
+      },
+    ],
   },
   INSUAMINCA: {
     name: 'INSUAMINCA',
+    displayTitle: 'Insuaminca',
     color: 'from-emerald-600 to-teal-600',
     badgeBg: 'bg-emerald-50',
     textColor: 'text-emerald-700',
     borderColor: 'border-emerald-200',
     portal: 'https://portalprv.insuaminca.org/login',
+    contactos: [
+      {
+        nombre: 'Marianella Barcelo',
+        cargo: 'Jefe de Sala de Ventas',
+        correo: 'telemarketing@insuaminca.com',
+        etiquetaCompleta: 'Marianella Barcelo (Jefe de Sala de Ventas) | telemarketing@insuaminca.com',
+      },
+    ],
   },
   VITALCLINIC: {
     name: 'VITALCLINIC',
+    displayTitle: 'Droguería Vital',
     color: 'from-cyan-600 to-blue-600',
     badgeBg: 'bg-cyan-50',
     textColor: 'text-cyan-700',
     borderColor: 'border-cyan-200',
     portal: 'https://ct.vitalclinicdrogueria.com/',
+    contactos: [
+      {
+        nombre: 'Dayana Alcalá',
+        cargo: 'Gte. Sala de Ventas',
+        correo: 'gerenciadeventas.vitalclinic@gmail.com',
+        etiquetaCompleta: 'Dayana Alcalá (Gte. Sala de Ventas) | gerenciadeventas.vitalclinic@gmail.com',
+      },
+      {
+        nombre: 'Jenny Chong',
+        cargo: 'Gte. Comercial',
+        correo: 'j.vitalclinic@gmail.com',
+        etiquetaCompleta: 'Jenny Chong (Gte. Comercial) | j.vitalclinic@gmail.com',
+      },
+    ],
   },
   ZAKIPHARMA: {
     name: 'ZAKIPHARMA',
+    displayTitle: 'Zakipharma',
     color: 'from-purple-600 to-pink-600',
     badgeBg: 'bg-purple-50',
     textColor: 'text-purple-700',
     borderColor: 'border-purple-200',
     portal: 'https://drogueriazakipharma.net/portal/',
+    contactos: [
+      {
+        nombre: 'Vanessa Navarro',
+        cargo: 'Compras',
+        correo: 'zakidrogueria@gmail.com',
+        etiquetaCompleta: 'Vanessa Navarro (Compras) | zakidrogueria@gmail.com',
+      },
+    ],
   },
   DROVENCENTRO: {
     name: 'DROVENCENTRO',
+    displayTitle: 'DROVENCENTRO',
     color: 'from-amber-600 to-orange-600',
     badgeBg: 'bg-amber-50',
     textColor: 'text-amber-800',
     borderColor: 'border-amber-200',
     portal: 'https://www.drovencentro.com/portal/',
+    contactos: [
+      {
+        correo: 'sistemas@drovencentro.com',
+        etiquetaCompleta: 'sistemas@drovencentro.com',
+      },
+    ],
   },
 };
 
@@ -104,6 +176,8 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   // Confirmation state for deleting a credencial
   const [credToDelete, setCredToDelete] = useState<CredencialDrogueria | null>(null);
+  // Expand / collapse remaining representatives
+  const [showAllUsers, setShowAllUsers] = useState(false);
 
   // Bloquear scroll de la interfaz de fondo (scroll lock) mientras el modal de confirmación está abierto
   useEffect(() => {
@@ -170,7 +244,11 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
       // Search term
       if (searchTerm) {
         const terms = searchTerm.toLowerCase().trim().split(/\s+/).filter(Boolean);
-        const searchable = `${c.drogueria} ${c.representante} ${c.cedula} ${c.correo} ${c.cargo} ${c.region} ${c.usuario} ${c.portalUrl}`.toLowerCase();
+        const drogMeta = DROGUERIAS_METADATA[c.drogueria.trim().toUpperCase()];
+        const contactosStr = drogMeta
+          ? `${drogMeta.displayTitle} ${drogMeta.contactos.map((ct) => ct.etiquetaCompleta).join(' ')}`
+          : '';
+        const searchable = `${c.drogueria} ${c.representante} ${c.cedula} ${c.correo} ${c.cargo} ${c.region} ${c.usuario} ${c.portalUrl} ${contactosStr}`.toLowerCase();
         const matches = terms.every((t) => searchable.includes(t));
         if (!matches) return false;
       }
@@ -188,10 +266,18 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
     return credenciales.filter((c) => (c.estatus || 'ACTIVO').toUpperCase() !== 'ACTIVO').length;
   }, [credenciales]);
 
+  const visibleCredenciales = useMemo(() => {
+    if (showAllUsers) return filteredCredenciales;
+    return filteredCredenciales.slice(0, INITIAL_VISIBLE_USERS);
+  }, [filteredCredenciales, showAllUsers]);
+
+  const hiddenUsersCount = Math.max(0, filteredCredenciales.length - INITIAL_VISIBLE_USERS);
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setSelectedDrogueria('all');
     setSelectedStatus('all');
+    setShowAllUsers(false);
   };
 
   const hasActiveFilters = searchTerm !== '' || selectedDrogueria !== 'all' || selectedStatus !== 'all';
@@ -330,7 +416,7 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
               Filtrar por Droguería y Criterios
             </span>
             <span className="text-xs text-slate-500 font-semibold">
-              Mostrando {filteredCredenciales.length} de {credenciales.length}
+              Mostrando {visibleCredenciales.length} de {filteredCredenciales.length}
             </span>
           </div>
 
@@ -408,6 +494,7 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
             )}
           </div>
         </div>
+
       </div>
 
       {/* 2. Visualización: Grid de Tarjetas o Tabla */}
@@ -432,14 +519,16 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
       ) : viewMode === 'grid' ? (
         /* Tarjetas con estilo idéntico a GD-Coordinadores / Representantes */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full">
-          {filteredCredenciales.map((cred) => {
+          {visibleCredenciales.map((cred) => {
             const meta = DROGUERIAS_METADATA[cred.drogueria.toUpperCase()] || {
               name: cred.drogueria,
+              displayTitle: cred.drogueria,
               color: 'from-slate-600 to-slate-800',
               badgeBg: 'bg-slate-100',
               textColor: 'text-slate-800',
               borderColor: 'border-slate-200',
               portal: cred.portalUrl,
+              contactos: [],
             };
             const isPasswordVisible = showAllPasswords || Boolean(visiblePasswords[cred.id]);
             const isActivo = (cred.estatus || 'ACTIVO').toUpperCase() === 'ACTIVO';
@@ -629,11 +718,12 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EAE5E1]/70">
-                {filteredCredenciales.map((cred) => {
+                {visibleCredenciales.map((cred) => {
                   const meta = DROGUERIAS_METADATA[cred.drogueria.toUpperCase()] || {
                     badgeBg: 'bg-slate-100',
                     textColor: 'text-slate-800',
                     borderColor: 'border-slate-200',
+                    contactos: [],
                   };
                   const isPasswordVisible = showAllPasswords || Boolean(visiblePasswords[cred.id]);
                   const isActivo = (cred.estatus || 'ACTIVO').toUpperCase() === 'ACTIVO';
@@ -762,6 +852,157 @@ export const CredencialesDrogueriasView: React.FC<CredencialesDrogueriasViewProp
           </div>
         </div>
       )}
+
+      {/* Botón con flecha para desplegar / contraer el resto de los usuarios (representantes) */}
+      {filteredCredenciales.length > INITIAL_VISIBLE_USERS && (
+        <div className="flex justify-center w-full">
+          <button
+            type="button"
+            onClick={() => setShowAllUsers((prev) => !prev)}
+            className="group inline-flex items-center justify-center gap-2.5 px-5 py-2.5 rounded-full bg-white hover:bg-slate-900 text-slate-800 hover:text-white border border-[#EAE5E1] hover:border-slate-900 shadow-xs hover:shadow-md text-xs sm:text-sm font-extrabold transition-all cursor-pointer"
+            title={
+              showAllUsers
+                ? 'Ocultar el resto de representantes'
+                : `Desplegar los ${hiddenUsersCount} representantes restantes`
+            }
+          >
+            <span>
+              {showAllUsers
+                ? `Ocultar representantes (mostrar primeros ${INITIAL_VISIBLE_USERS})`
+                : `Ver el resto de representantes (${hiddenUsersCount} más)`}
+            </span>
+            <span className="w-6 h-6 rounded-full bg-[#F8F4F2] group-hover:bg-white/20 flex items-center justify-center transition-colors">
+              {showAllUsers ? (
+                <ChevronUp className="w-4 h-4 text-theme-primary group-hover:text-white transition-transform" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-theme-primary group-hover:text-white transition-transform group-hover:translate-y-0.5" />
+              )}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* 3. Directorio de Correos y Contactos por Droguería al final del menú */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-3 sm:p-6 border border-[#EAE5E1] shadow-2xs flex flex-col gap-2.5 sm:gap-3.5 w-full max-w-full">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Mail className="w-3.5 h-3.5 text-theme-primary shrink-0" />
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+              Correos y Contactos por Droguería
+            </span>
+          </div>
+          {selectedDrogueria !== 'all' && (
+            <span className="text-[11px] font-bold text-slate-500">
+              Filtrado por: {DROGUERIAS_METADATA[selectedDrogueria]?.displayTitle || selectedDrogueria}
+            </span>
+          )}
+        </div>
+
+        <div
+          className={`grid gap-2.5 sm:gap-3 ${
+            selectedDrogueria === 'all'
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5'
+              : 'grid-cols-1'
+          }`}
+        >
+          {(['VITALCLINIC', 'INSUAMINCA', 'ZAKIPHARMA', 'BLV', 'DROVENCENTRO'] as const)
+            .filter(
+              (drogKey) =>
+                selectedDrogueria === 'all' ||
+                selectedDrogueria.toUpperCase() === drogKey
+            )
+            .map((drogKey) => {
+              const meta = DROGUERIAS_METADATA[drogKey];
+              if (!meta) return null;
+              const isSelected = selectedDrogueria.toUpperCase() === drogKey;
+
+              return (
+                <div
+                  key={drogKey}
+                  className={`rounded-2xl p-3 border transition-all flex flex-col justify-between gap-2 ${
+                    isSelected
+                      ? `${meta.badgeBg} ${meta.borderColor} shadow-2xs`
+                      : 'bg-[#F8F4F2]/90 border-[#EAE5E1] hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedDrogueria(isSelected ? 'all' : drogKey)
+                      }
+                      className="inline-flex items-center gap-1.5 text-left cursor-pointer group/drog"
+                      title={`Filtrar credenciales de ${meta.displayTitle}`}
+                    >
+                      <span
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-black tracking-wide border ${meta.badgeBg} ${meta.textColor} ${meta.borderColor}`}
+                      >
+                        {meta.displayTitle}
+                      </span>
+                    </button>
+
+                    {meta.portal && (
+                      <a
+                        href={meta.portal}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-0.5 shrink-0"
+                        title={`Ir al portal de ${meta.displayTitle}`}
+                      >
+                        <span>Portal</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {meta.contactos.map((ct, idx) => {
+                      const copyId = `drog-email-${drogKey}-${idx}`;
+                      return (
+                        <div
+                          key={copyId}
+                          className="bg-white/90 rounded-xl px-2.5 py-1.5 border border-[#EAE5E1]/90 flex flex-col gap-0.5"
+                        >
+                          {ct.nombre && (
+                            <div className="text-[11px] font-bold text-slate-800 leading-tight">
+                              {ct.nombre}{' '}
+                              {ct.cargo && (
+                                <span className="font-medium text-slate-500">
+                                  ({ct.cargo})
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between gap-1.5">
+                            <a
+                              href={`mailto:${ct.correo}`}
+                              className="text-[11px] font-mono font-semibold text-blue-700 hover:text-blue-900 hover:underline truncate"
+                              title={ct.etiquetaCompleta}
+                            >
+                              {ct.correo}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(ct.correo, copyId)}
+                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-md transition-colors cursor-pointer shrink-0"
+                              title={`Copiar correo: ${ct.correo}`}
+                            >
+                              {copiedKey === copyId ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </div>
 
       {/* Confirmation Modal for Deletion */}
       {credToDelete && (

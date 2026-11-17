@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Plus,
   Check,
+  RefreshCw,
 } from 'lucide-react';
 import { LinkedSpreadsheetInfo } from '../services/sheetsService';
 import {
@@ -31,8 +32,8 @@ import { FileSpreadsheet } from 'lucide-react';
 interface RepFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (rep: Representante, syncToSheets: boolean) => Promise<void> | void;
-  onDelete?: (id: string) => void;
+  onSave: (rep: Representante, syncToSheets: boolean, originalRep?: Representante) => Promise<void> | void;
+  onDelete?: (id: string) => Promise<void> | void;
   repToEdit: Representante | null;
   existingReps?: Representante[];
   linkedSheet?: LinkedSpreadsheetInfo | null;
@@ -331,9 +332,11 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
   const [secuencia, setSecuencia] = useState('');
   const [fechaIngreso, setFechaIngreso] = useState('');
 
-  // Validation state
+  // Validation & async submission state
   const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isBusy = isSubmitting || isSavingToSheets;
 
   // Obtiene la secuencia que corresponde al representante (ej. 019 para Abril Marquina, o 104 para nuevo)
   const getRepSecuencia = (rep: Representante | null, currentSec: string, currentSector: string): string => {
@@ -552,8 +555,9 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
     setFechaIngreso(formatted);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isBusy) return;
 
     if (!nombre.trim()) {
       setError('El nombre completo del representante es obligatorio.');
@@ -664,23 +668,39 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
       fechaIngreso: fechaIngreso.trim(),
     };
 
-    // Guardar directamente en la aplicación y sincronizar con Google Sheets sin consultar
-    const shouldSync = Boolean(linkedSheet);
-    onSave(updatedRep, shouldSync);
-    onClose();
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await onSave(updatedRep, true, repToEdit || undefined);
+      onClose();
+    } catch (err: any) {
+      setError(
+        err?.message ||
+          'No se pudo sincronizar el cambio con Google Sheets. Verifica tu conexión o el endpoint de Google Apps Script.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = () => {
-    if (repToEdit && onDelete) {
-      onDelete(repToEdit.id);
-      onClose();
+  const handleDelete = async () => {
+    if (repToEdit && onDelete && !isBusy) {
+      setIsSubmitting(true);
+      try {
+        await onDelete(repToEdit.id);
+        onClose();
+      } catch (err: any) {
+        setError(err?.message || 'Error al eliminar el representante.');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs overflow-hidden overscroll-none animate-in fade-in duration-150"
-      onClick={onClose}
+      onClick={() => !isBusy && onClose()}
     >
       <div
         className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-[#EAE5E1] w-full max-w-full sm:max-w-xl max-h-[90vh] flex flex-col overflow-hidden overscroll-contain my-auto animate-in fade-in zoom-in-95 duration-150"
@@ -1088,16 +1108,27 @@ export const RepFormModal: React.FC<RepFormModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full px-3 py-2 text-sm font-bold text-slate-600 hover:text-[#1A1A1E] bg-white hover:bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl transition-colors cursor-pointer text-center"
+                disabled={isBusy}
+                className="w-full px-3 py-2 text-sm font-bold text-slate-600 hover:text-[#1A1A1E] bg-white hover:bg-[#F8F4F2] border border-[#EAE5E1] rounded-xl transition-colors cursor-pointer text-center disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-bold text-white bg-theme-primary hover:bg-theme-primary-hover rounded-xl shadow-2xs transition-all cursor-pointer text-center"
+                disabled={isBusy}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-bold text-white bg-theme-primary hover:bg-theme-primary-hover rounded-xl shadow-2xs transition-all cursor-pointer text-center disabled:opacity-70"
               >
-                <Check className="w-4 h-4 shrink-0" />
-                <span className="truncate">{isEditMode ? 'Guardar' : 'Registrar'}</span>
+                {isBusy ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 shrink-0 animate-spin" />
+                    <span className="truncate">Guardando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{isEditMode ? 'Guardar' : 'Registrar'}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -53,6 +53,9 @@ import {
   deleteCredencialFromSpreadsheet,
   getOrCreateCanonicalSpreadsheet,
   fetchGenericSpreadsheet,
+  getGoogleSheetsScriptUrl,
+  saveLocalRepMutation,
+  CANONICAL_DATABASE_TITLE,
 } from './services/sheetsService';
 import { exportToCsvFile } from './utils/phoneUtils';
 import { exportRepsToExcel, exportGdsToExcel, exportCredencialesToExcel, getStandardRegion } from './utils/excelExport';
@@ -366,8 +369,22 @@ export default function App() {
     if (linkedSheet && linkedSheet.spreadsheetId) {
       return linkedSheet;
     }
+    const storedSheet = getLinkedSpreadsheetInfo();
+    if (storedSheet && storedSheet.spreadsheetId) {
+      setLinkedSheet(storedSheet);
+      return storedSheet;
+    }
+    const scriptUrl = getGoogleSheetsScriptUrl();
+    if (scriptUrl) {
+      return {
+        spreadsheetId: scriptUrl,
+        spreadsheetUrl: scriptUrl,
+        title: CANONICAL_DATABASE_TITLE,
+        sheetTabName: 'Representantes',
+      };
+    }
     const token = await getAccessToken();
-    if (!token) return null;
+    if (!token || token === 'local-token') return null;
     try {
       const canonical = await getOrCreateCanonicalSpreadsheet(repsData, gdsData);
       if (canonical) {
@@ -683,12 +700,7 @@ export default function App() {
     }
   };
 
-  const handleSaveRep = async (savedRep: Representante, syncToSheets: boolean = false) => {
-    const normalizedSavedRep: Representante = {
-      ...savedRep,
-      unidadNegocio: getMappedUnit(savedRep.unidadNegocio),
-    };
-    // 1. Guardar en el estado local de la aplicación (Actualización inmediata)
+  const applyLocalRepUpdate = (normalizedSavedRep: Representante) => {
     setRepsData((prev) => {
       const index = prev.findIndex((r) => r.id === normalizedSavedRep.id);
       let updated: Representante[];
@@ -707,49 +719,91 @@ export default function App() {
       return sorted;
     });
 
-    // Also update selectedContact if it's currently open
     setSelectedContact((current) => {
       if (current && (current as Representante).id === normalizedSavedRep.id) {
         return normalizedSavedRep;
       }
       return current;
     });
+  };
 
-    // 2. Sincronizar automáticamente en la misma base de datos de Google Sheets
+  const handleSaveRep = async (
+    savedRep: Representante,
+    _syncToSheets: boolean = true,
+    originalRep?: Representante
+  ) => {
+    const normalizedSavedRep: Representante = {
+      ...savedRep,
+      unidadNegocio: getMappedUnit(savedRep.unidadNegocio),
+    };
+
+    const existingRep = originalRep || repsData.find((r) => r.id === normalizedSavedRep.id);
+    const isEdit = Boolean(existingRep);
+
     const activeSheet = await getActiveSpreadsheet();
-    if (activeSheet) {
+    const scriptUrl = getGoogleSheetsScriptUrl();
+    const token = await getAccessToken();
+    const hasRemoteWriteEndpoint = Boolean(
+      scriptUrl ||
+        (activeSheet?.spreadsheetId && activeSheet.spreadsheetId.includes('script.google.com')) ||
+        (activeSheet && token && token !== 'local-token')
+    );
+
+    if (hasRemoteWriteEndpoint) {
       setIsSavingToSheets(true);
       try {
-        const syncRes = await syncRepToSpreadsheet(activeSheet.spreadsheetId, normalizedSavedRep, activeSheet.sheetTabName);
-        const updatedInfo: LinkedSpreadsheetInfo = {
-          ...activeSheet,
-          lastSyncedAt: new Date().toISOString(),
-        };
-        setLinkedSheet(updatedInfo);
-        setLinkedSpreadsheetInfo(updatedInfo);
+        const targetSpreadsheetId = activeSheet?.spreadsheetId || scriptUrl;
+        const targetTabName = activeSheet?.sheetTabName || 'Representantes';
 
-        // Re-ejecución inmediata (Re-fetch): Inmediatamente después de recibir respuesta exitosa
-        await cargarRepresentantes(activeSheet);
+        const syncRes = await syncRepToSpreadsheet(
+          targetSpreadsheetId,
+          normalizedSavedRep,
+          targetTabName,
+          existingRep,
+          isEdit
+        );
+
+        // Actualizar estado local después de confirmar que Google Sheets guardó el cambio correctamente
+        applyLocalRepUpdate(normalizedSavedRep);
+
+        if (activeSheet) {
+          const updatedInfo: LinkedSpreadsheetInfo = {
+            ...activeSheet,
+            lastSyncedAt: new Date().toISOString(),
+          };
+          setLinkedSheet(updatedInfo);
+          setLinkedSpreadsheetInfo(updatedInfo);
+          // Forzar re-sincronización desde Google Sheets tras confirmar el guardado
+          await cargarRepresentantes(updatedInfo);
+        }
 
         setSyncToast({
           type: 'success',
-          message: syncRes.action === 'created'
-            ? `"${savedRep.nombre}" agregado al aplicativo y a Google Sheets.`
-            : `"${savedRep.nombre}" actualizado en el aplicativo y en Google Sheets.`,
+          message:
+            syncRes.action === 'created'
+              ? `"${savedRep.nombre}" registrado y sincronizado en Google Sheets (fila ${syncRes.rowNumber}).`
+              : `"${savedRep.nombre}" actualizado y guardado en Google Sheets (fila ${syncRes.rowNumber}).`,
         });
       } catch (err: any) {
-        console.error('Error auto-syncing to Google Sheets:', err);
+        console.error('Error syncing representative to Google Sheets:', err);
         setSyncToast({
           type: 'error',
-          message: `Guardado localmente. Error en Google Sheets: ${err.message}`,
+          message: `Error al guardar en Google Sheets: ${err?.message || 'Error de conexión'}`,
         });
+        throw err;
       } finally {
         setIsSavingToSheets(false);
       }
     } else {
+      // Modo local / hoja pública sin Web App configurado aún: persistir mutación localmente para que no se pierda al recargar
+      saveLocalRepMutation(normalizedSavedRep, isEdit ? 'update' : 'create', existingRep, false);
+      applyLocalRepUpdate(normalizedSavedRep);
+
       setSyncToast({
         type: 'info',
-        message: `"${savedRep.nombre}" guardado localmente con éxito.`,
+        message: activeSheet
+          ? `"${savedRep.nombre}" actualizado y persistido en el navegador. Para escritura automática en tu hoja sin OAuth, vincula la URL de tu Google Apps Script en la pestaña "Google Sheets".`
+          : `"${savedRep.nombre}" guardado y persistido localmente con éxito.`,
       });
     }
   };
